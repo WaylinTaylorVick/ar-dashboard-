@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:#f5f5f5; --bg2:#ffffff; --bg3:#ebedf0; --border:#d1d5db;
@@ -576,28 +577,12 @@ tr.trow:hover td{background:var(--accent);color:#fff}
       <div style="position:relative;height:300px;padding:16px"><canvas id="o2cCollChart"></canvas></div>
     </div>
   </div>
-  <div class="sec" style="margin-bottom:20px">
-    <div class="shdr"><div class="stitle">AR Waterfall</div><div class="ssub">Billings → Collections → Net movement by period</div></div>
-    <div style="display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center">
-      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="wf-from" value="2025-01-01" style="font-size:12px"></div>
-      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="wf-to" value="2026-04-30" style="font-size:12px"></div>
-      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Entity</label>
-        <select id="wf-entity" style="font-size:12px">
-          <option value="all">All Entities</option>
-          <option value="Brookville">Brookville</option>
-          <option value="Kilgore">Kilgore</option>
-          <option value="Wilkes-Barre">Wilkes-Barre</option>
-        </select>
-      </div>
-      <button onclick="renderWaterfall()" style="padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Apply</button>
-    </div>
-    <div class="krow" id="wf-kpis" style="padding:16px 16px 0"></div>
-    <div style="position:relative;height:300px;padding:16px"><canvas id="wfChart"></canvas></div>
-  </div>
+
 </div>
 
 <!-- ══════════════ COLLECTIONS FORECAST ══════════════ -->
 <div class="panel" id="panel-coll-forecast">
+
   <div style="background:rgba(139,35,50,.04);border:1px solid rgba(139,35,50,.15);border-left:4px solid var(--accent);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;line-height:1.6;color:var(--text2)">
     <strong style="color:var(--text)">Methodology — Two-layer model:</strong>
     &nbsp;<strong>Current invoices</strong> (not yet overdue): Expected date = MAX(due_date, invoice_date + customer avg DTP). Each invoice lands in a specific forecast week.
@@ -2116,8 +2101,8 @@ async function loadO2CData(forceReload = false) {
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      get('vw_ar_summary?select=location,total_ar'),
       getAll('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
+      get('vw_ar_summary?select=location,total_ar'),
     ]);
     O2C.revenue   = rev;
     O2C.bookings  = book;
@@ -2206,19 +2191,36 @@ function renderO2CBookings() {
   const bkN = bk.map(r=>({...r,month:(r.month||'').slice(0,7)}));
   const shN = sh.map(r=>({...r,month:(r.month||'').slice(0,7)}));
   const months = [...new Set([...bkN.map(r=>r.month),...shN.map(r=>r.month)])].sort();
+  const netChange = months.map(m => {
+    const bkV = bkN.find(x=>x.month===m)?.[+entity==='all'?'bookings':'bookings'] || 0;
+    const shV = shN.find(x=>x.month===m)?.revenue || 0;
+    return +bkV - +shV;
+  });
   if (charts.o2cBook) charts.o2cBook.destroy();
   charts.o2cBook = new Chart(document.getElementById('o2cBookChart'), {
     type:'bar',
     data:{
       labels: months.map(mLbl),
       datasets:[
-        {label:'Bookings',  data:months.map(m=>{ const r=bkN.find(x=>x.month===m); return r?+r.bookings:0; }), backgroundColor:'rgba(74,85,104,.7)',borderRadius:2},
-        {label:'Shipments', data:months.map(m=>{ const r=shN.find(x=>x.month===m); return r?+r.revenue:0;   }), backgroundColor:'rgba(139,35,50,.7)',borderRadius:2},
+        {label:'Bookings',   data:months.map(m=>{ const r=bkN.find(x=>x.month===m); return r?+r.bookings:0; }), backgroundColor:'rgba(74,85,104,.7)', borderRadius:2, order:2},
+        {label:'Shipments',  data:months.map(m=>{ const r=shN.find(x=>x.month===m); return r?+r.revenue:0;   }), backgroundColor:'rgba(139,35,50,.7)', borderRadius:2, order:2},
+        {label:'Net (Book-Ship)', data:netChange, type:'line',
+          borderColor:'#d97706', backgroundColor:'rgba(217,119,6,.12)',
+          borderWidth:2, pointRadius:3, pointBackgroundColor:'#d97706',
+          fill:false, tension:.3, yAxisID:'net', order:1,
+          datalabels:{display:false}},
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
+      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:{display:false}},
+      scales:{
+        x:{ticks:{font:{size:9},maxRotation:45}},
+        y:{ticks:{callback:v=>fmtK(v)},title:{display:false}},
+        net:{type:'linear',position:'right',
+          ticks:{callback:v=>fmtK(v),font:{size:9}},
+          grid:{drawOnChartArea:false},
+          title:{display:true,text:'Net',font:{size:9},color:'#d97706'}}
+      }}
   });
 }
 
@@ -2250,24 +2252,45 @@ async function renderWaterfall() {
   const to     = (document.getElementById('wf-to').value||'2026-12').slice(0,7);
   const entity = document.getElementById('wf-entity').value;
 
-  // Normalize month from 'YYYY-MM-DD' → 'YYYY-MM' for consistent comparison
-  const arNorm = (O2C.ar||[]).map(r=>({...r, month: (r.month||'').slice(0,7)}));
+  // Normalize month to YYYY-MM
+  const arNorm = (O2C.ar||[]).map(r=>({...r, month:(r.month||'').slice(0,7)}));
   let data = arNorm.filter(r => r.month >= from && r.month <= to && (entity==='all'||r.location===entity));
   const months = [...new Set(data.map(r=>r.month))].sort();
-  const agg = months.map(m=>{
+
+  // Aggregate billings + collections per month
+  const agg = months.map(m => {
     const rows = data.filter(r=>r.month===m);
-    return {m, bills:rows.reduce((s,r)=>s+(+r.billings||0),0), colls:rows.reduce((s,r)=>s+(+r.collections||0),0), bal:rows.reduce((s,r)=>s+(+r.ar_balance||0),0)};
+    return {
+      m,
+      bills: rows.reduce((s,r)=>s+(+r.billings||0), 0),
+      colls: rows.reduce((s,r)=>s+(+r.collections||0), 0),
+    };
   });
-  const totB = agg.reduce((s,r)=>s+r.bills,0);
-  const totC = agg.reduce((s,r)=>s+r.colls,0);
-  const lastBal = agg.length?agg[agg.length-1].bal:0;
-  const effPct  = totB>0?totC/totB*100:0;
+
+  // Backwards walk: start from current live AR, subtract net change per month going back
+  // ending_AR[n-1] = ending_AR[n] - billings[n] + collections[n]
+  const currentAR = (O2C.arSummary||[])
+    .filter(r => entity==='all' || r.location===entity)
+    .reduce((s,r) => s+(+r.total_ar||0), 0);
+
+  // Build ending AR for each month by walking backwards from current
+  const endingAR = {};
+  let runningAR = currentAR;
+  // Most recent month = current AR; walk backwards
+  for (let i = agg.length - 1; i >= 0; i--) {
+    endingAR[agg[i].m] = runningAR;
+    runningAR = runningAR - agg[i].bills + agg[i].colls; // prior period
+  }
+
+  const totB    = agg.reduce((s,r)=>s+r.bills, 0);
+  const totC    = agg.reduce((s,r)=>s+r.colls, 0);
+  const effPct  = totB > 0 ? totC/totB*100 : 0;
 
   document.getElementById('wf-kpis').innerHTML=[
-    {l:'Total Billings',   v:fmtK(totB),  s:'Gross invoiced',       c:'n'},
-    {l:'Total Collections',v:fmtK(totC),  s:'BV + KG only',         c:'g'},
+    {l:'Total Billings',   v:fmtK(totB),      s:'Gross invoiced',          c:'n'},
+    {l:'Total Collections',v:fmtK(totC),      s:'BV + KG only',            c:'g'},
     {l:'Collection Rate',  v:effPct.toFixed(1)+'%', s:'Collections ÷ Billings', c:effPct>=100?'g':'n'},
-    {l:'Ending AR Balance',v:fmtK((O2C.arSummary||[]).filter(r=>entity==='all'||r.location===entity).reduce((s,r)=>s+(+r.total_ar||0),0)),s:'Current open AR (live)',c:'n'},
+    {l:'Current Open AR',  v:fmtK(currentAR), s:'Live from AR summary',    c:'n'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   if (charts.wf) charts.wf.destroy();
@@ -2278,7 +2301,7 @@ async function renderWaterfall() {
       datasets:[
         {label:'Billings',    data:agg.map(r=>r.bills), backgroundColor:'rgba(74,85,104,.7)',stack:'s'},
         {label:'Collections', data:agg.map(r=>r.colls), backgroundColor:'rgba(22,163,74,.7)', stack:'s2'},
-        {label:'AR Balance',  data:agg.map(r=>r.bal>0?r.bal:null), type:'line',
+        {label:'Ending AR',   data:months.map(m=>endingAR[m]||null), type:'line',
           borderColor:'#8b2332',backgroundColor:'rgba(139,35,50,.08)',
           yAxisID:'bal',tension:.3,pointRadius:3,datalabels:{display:false}},
       ]
@@ -2677,75 +2700,84 @@ async function refreshAll() {
 // ═══════════════════════════════════════════════════════
 
 function buildForecastExportData() {
-  const scenario = document.getElementById('fc-scenario').value;
-  const site     = document.getElementById('fc-site').value;
-  const weeksOut = parseInt(document.getElementById('fc-weeks').value);
-  const weeks    = buildForecastWeeks(weeksOut);
+  const scenario  = document.getElementById('fc-scenario').value;
+  const site      = document.getElementById('fc-site').value;
+  const weeksOut  = parseInt(document.getElementById('fc-weeks').value);
+  const weeks     = buildForecastWeeks(weeksOut);
   const { currentByWeek, overdueByWeek } = buildForecastLayers(scenario, site, weeks);
-  const siteLocs = site === 'all' ? ['Brookville', 'Kilgore', 'Wilkes-Barre'] : [site];
+  const siteLocs  = site === 'all' ? ['Brookville', 'Kilgore', 'Wilkes-Barre'] : [site];
 
-  // Build rows: one row per week, columns per site + total
-  const rows = weeks.map(w => {
+  // Layout: sites as ROWS, weeks as COLUMNS
+  // Rows: for each site → Current, Overdue, Total; then Grand Total
+  const wkLabels = weeks.map(w => {
     const d = new Date(w + 'T00:00:00');
-    const wkLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    const row = { 'Week Of': wkLabel };
-    let total = 0;
-    siteLocs.forEach(loc => {
-      const current  = currentByWeek[w]?.[loc]  || 0;
-      const overdue  = overdueByWeek[w]?.[loc]  || 0;
-      const combined = current + overdue;
-      row[loc + ' - Current']  = Math.round(current);
-      row[loc + ' - Overdue']  = Math.round(overdue);
-      row[loc + ' - Total']    = Math.round(combined);
-      total += combined;
-    });
-    row['Grand Total'] = Math.round(total);
-    return row;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   });
 
-  // Add totals row
-  const totals = { 'Week Of': 'TOTAL' };
-  const cols = Object.keys(rows[0]).filter(k => k !== 'Week Of');
-  cols.forEach(c => {
-    totals[c] = rows.reduce((s, r) => s + (+r[c] || 0), 0);
-  });
-  rows.push(totals);
-
-  // Add metadata rows at top
   const scenarioLabel = scenario.charAt(0).toUpperCase() + scenario.slice(1);
   const siteLabel     = site === 'all' ? 'All Sites' : site;
-  const meta = [
-    { 'Week Of': 'Collections Forecast Export' },
-    { 'Week Of': 'Scenario: ' + scenarioLabel },
-    { 'Week Of': 'Site: '     + siteLabel },
-    { 'Week Of': 'Generated: ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
-    { 'Week Of': '' },
-  ];
 
-  return { rows, meta, cols: ['Week Of', ...cols] };
+  // Header row: Site | Type | Wk1 | Wk2 | ...
+  const header = ['Site', 'Type', ...wkLabels, 'Total'];
+
+  const dataRows = [];
+
+  siteLocs.forEach(loc => {
+    const currRow  = [loc, 'Current'];
+    const ovdRow   = [loc, 'Overdue'];
+    const totRow   = [loc, 'Total'];
+    let currTotal  = 0, ovdTotal = 0;
+
+    weeks.forEach(w => {
+      const c = Math.round(currentByWeek[w]?.[loc] || 0);
+      const o = Math.round(overdueByWeek[w]?.[loc] || 0);
+      currRow.push(c); ovdRow.push(o); totRow.push(c + o);
+      currTotal += c;  ovdTotal += o;
+    });
+    currRow.push(currTotal);
+    ovdRow.push(ovdTotal);
+    totRow.push(currTotal + ovdTotal);
+
+    dataRows.push(currRow, ovdRow, totRow);
+  });
+
+  // Grand total row
+  const grandRow = ['Grand Total', ''];
+  let grandTotal = 0;
+  weeks.forEach((w, i) => {
+    const wTotal = siteLocs.reduce((s, loc) =>
+      s + Math.round((currentByWeek[w]?.[loc]||0) + (overdueByWeek[w]?.[loc]||0)), 0);
+    grandRow.push(wTotal);
+    grandTotal += wTotal;
+  });
+  grandRow.push(grandTotal);
+  dataRows.push(grandRow);
+
+  return { header, dataRows, scenarioLabel, siteLabel };
 }
 
 function exportForecastCSV() {
-  const { rows, meta, cols } = buildForecastExportData();
-  const allRows = [...meta, ...rows];
-  const lines   = [];
+  const { header, dataRows, scenarioLabel, siteLabel } = buildForecastExportData();
+  const scenario = document.getElementById('fc-scenario').value;
+  const site     = document.getElementById('fc-site').value;
 
-  // Header
-  lines.push(cols.map(c => '"' + c + '"').join(','));
-
+  const lines = [];
+  // Metadata (no blank rows — just 3 tight header lines)
+  lines.push('"Collections Forecast","Scenario: ' + scenarioLabel + '","Site: ' + siteLabel + '","Generated: ' + new Date().toLocaleDateString('en-US') + '"');
+  lines.push('');
+  // Column headers
+  lines.push(header.map(c => '"' + c + '"').join(','));
   // Data
-  allRows.forEach(r => {
-    lines.push(cols.map(c => {
-      const v = r[c] ?? '';
-      return typeof v === 'number' ? v : '"' + String(v).replace(/"/g, '""') + '"';
+  dataRows.forEach(row => {
+    lines.push(row.map((v, i) => {
+      if (i < 2) return '"' + String(v) + '"';
+      return typeof v === 'number' ? v : '"' + String(v) + '"';
     }).join(','));
   });
 
   const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  const scenario = document.getElementById('fc-scenario').value;
-  const site     = document.getElementById('fc-site').value;
   a.href     = url;
   a.download = 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.csv';
   a.click();
@@ -2753,51 +2785,68 @@ function exportForecastCSV() {
 }
 
 function exportForecastExcel() {
-  // Build HTML table that Excel opens natively — no library needed
-  const { rows, meta, cols } = buildForecastExportData();
+  const { header, dataRows, scenarioLabel, siteLabel } = buildForecastExportData();
   const scenario = document.getElementById('fc-scenario').value;
   const site     = document.getElementById('fc-site').value;
 
-  let table = '<table border="1"><thead><tr>';
-  cols.forEach(c => {
-    table += '<th style="background:#1f4e79;color:white;padding:6px 10px;font-weight:bold">' + c + '</th>';
-  });
-  table += '</tr></thead><tbody>';
+  // Use SheetJS (loaded via CDN) for true xlsx output
+  if (typeof XLSX === 'undefined') {
+    alert('Loading Excel library — please try again in a moment.');
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = exportForecastExcel;
+    document.head.appendChild(s);
+    return;
+  }
 
-  // Metadata rows
-  meta.forEach(r => {
-    table += '<tr><td colspan="' + cols.length + '" style="color:#666;font-style:italic;padding:3px 8px">'
-      + (r['Week Of'] || '') + '</td></tr>';
-  });
+  const wb = XLSX.utils.book_new();
+
+  // Build array of arrays for the sheet
+  const sheetData = [];
+
+  // Metadata
+  sheetData.push(['Collections Forecast']);
+  sheetData.push(['Scenario: ' + scenarioLabel + '   |   Site: ' + siteLabel
+    + '   |   Generated: ' + new Date().toLocaleDateString('en-US')]);
+  sheetData.push([]); // one blank row
+
+  // Header
+  sheetData.push(header);
 
   // Data rows
-  rows.forEach((r, i) => {
-    const isTotals = r['Week Of'] === 'TOTAL';
-    const bg = isTotals ? 'background:#1f4e79;color:white;font-weight:bold'
-             : i % 2 === 0 ? 'background:#f7f9fc' : '';
-    table += '<tr>';
-    cols.forEach(c => {
-      const v   = r[c] ?? '';
-      const num = typeof v === 'number';
-      const fmt = num && v !== 0 ? '$' + v.toLocaleString('en-US') : (v === 0 && num ? '—' : v);
-      table += '<td style="padding:5px 10px;text-align:' + (num ? 'right' : 'left') + ';' + bg + '">' + fmt + '</td>';
-    });
-    table += '</tr>';
+  dataRows.forEach(row => sheetData.push(row));
+
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Column widths
+  ws['!cols'] = [{ wch: 18 }, { wch: 10 }];
+  for (let i = 2; i < header.length; i++) ws['!cols'].push({ wch: 14 });
+
+  // Style header row (row index 3 = 0-based)
+  const headerRowIdx = 3;
+  header.forEach((_, ci) => {
+    const cellRef = XLSX.utils.encode_cell({ r: headerRowIdx, c: ci });
+    if (!ws[cellRef]) return;
+    ws[cellRef].s = {
+      font:    { bold: true, color: { rgb: 'FFFFFF' } },
+      fill:    { fgColor: { rgb: '1F4E79' } },
+      alignment: { horizontal: 'center' }
+    };
   });
-  table += '</tbody></table>';
 
-  const html_content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
-    + 'xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">'
-    + '<head><meta charset="utf-8"><style>td,th{font-family:Calibri,Arial,sans-serif;font-size:11pt}</style></head>'
-    + '<body>' + table + '</body></html>';
+  // Style Grand Total row
+  const grandRowIdx = sheetData.length - 1;
+  header.forEach((_, ci) => {
+    const cellRef = XLSX.utils.encode_cell({ r: grandRowIdx, c: ci });
+    if (!ws[cellRef]) return;
+    ws[cellRef].s = {
+      font: { bold: true, color: { rgb: 'FFFFFF' } },
+      fill: { fgColor: { rgb: '1F4E79' } }
+    };
+  });
 
-  const blob = new Blob([html_content], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.xls';
-  a.click();
-  URL.revokeObjectURL(url);
+  XLSX.utils.book_append_sheet(wb, ws, 'Collections Forecast');
+  XLSX.writeFile(wb, 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.xlsx');
 }
 
 </script>
