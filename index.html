@@ -195,6 +195,8 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <div class="tab" data-tab="cust">Customer Detail</div>
   <div class="tab" data-tab="sp">Salesperson</div>
   <div class="tab" data-tab="wow">&#128200; AR Movements</div>
+  <div class="tab" data-tab="billings">&#128181; Billings</div>
+  <div class="tab" data-tab="collections-analysis">&#128200; Collections</div>
   <div class="tdiv"></div>
   <span class="tgl">Team</span>
   <div class="tab" data-tab="notes">&#128221; Notes</div>
@@ -376,6 +378,104 @@ tr.trow:hover td{background:var(--accent);color:#fff}
       <th class="amt">Prev Balance</th><th class="amt">Curr Balance</th><th class="amt">Change</th>
     </tr></thead><tbody id="wow-tbody"></tbody></table></div>
     <div id="wow-more" class="show-more hidden">Show more&hellip;</div>
+  </div>
+</div>
+
+
+<!-- ══════════════ BILLINGS ══════════════ -->
+<div class="panel" id="panel-billings">
+  <div style="background:rgba(217,119,6,0.07);border:1px solid rgba(217,119,6,0.2);border-left:4px solid #d97706;border-radius:6px;padding:10px 16px;margin-bottom:18px;font-size:12px;color:#92400e">
+    &#9432; <strong>AR-derived billings data.</strong> Figures are based on invoiced amounts from accounts receivable records using <code>net_revenue</code> where available, falling back to <code>invoice_total</code>. This is <strong>not</strong> a substitute for audited revenue or financial reporting.
+  </div>
+  <div class="krow" id="bill-kpis"></div>
+  <div class="frow">
+    <div class="fg"><label>Period:</label>
+      <select id="bill-period">
+        <option value="MTD">Month to Date</option>
+        <option value="QTD">Quarter to Date</option>
+        <option value="YTD" selected>Year to Date</option>
+        <option value="L3">Last 3 Months</option>
+        <option value="L6">Last 6 Months</option>
+        <option value="L12">Last 12 Months</option>
+        <option value="ALL">All Time</option>
+      </select>
+    </div>
+    <div class="fg"><label>Plant:</label><select id="bill-plant"><option value="All">All Plants</option></select></div>
+    <div class="fg"><label>Group by:</label>
+      <select id="bill-group">
+        <option value="month">Month</option>
+        <option value="quarter">Quarter</option>
+      </select>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Billings Over Time</div><div class="ssub" id="bill-chart-sub"></div></div>
+      <div style="position:relative;height:320px;padding:16px"><canvas id="billTrendChart"></canvas></div>
+    </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">By Location</div></div>
+      <div style="padding:16px" id="bill-loc-bars"></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Top Customers by Billings</div></div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Customer</th><th>Plant</th><th class="amt">Billed</th><th class="amt">Invoices</th>
+      </tr></thead><tbody id="bill-cust-body"></tbody></table></div>
+    </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">By Salesperson</div></div>
+      <div style="overflow-x:auto"><table><thead><tr>
+        <th>Salesperson</th><th>Plant</th><th class="amt">Billed</th><th class="amt">Invoices</th>
+      </tr></thead><tbody id="bill-sp-body"></tbody></table></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ COLLECTIONS ANALYSIS ══════════════ -->
+<div class="panel" id="panel-collections-analysis">
+  <div class="krow" id="coll-an-kpis"></div>
+  <div class="frow">
+    <div class="fg"><label>Period:</label>
+      <select id="ca-period">
+        <option value="L3">Last 3 Months</option>
+        <option value="L6">Last 6 Months</option>
+        <option value="L12" selected>Last 12 Months</option>
+        <option value="ALL">All Time</option>
+      </select>
+    </div>
+    <div class="fg"><label>Plant:</label><select id="ca-plant"><option value="All">All Plants</option></select></div>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Monthly Collections</div><div class="ssub">Amount collected by month</div></div>
+      <div style="position:relative;height:300px;padding:16px"><canvas id="caMonthChart"></canvas></div>
+    </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Avg Days to Collect</div><div class="ssub">By location over time</div></div>
+      <div style="position:relative;height:300px;padding:16px"><canvas id="caDTPChart"></canvas></div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="sec">
+      <div class="shdr"><div class="stitle">On-Time vs Late Payments</div></div>
+      <div style="position:relative;height:260px;padding:16px"><canvas id="caOnTimeChart"></canvas></div>
+    </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Collections Efficiency by Plant</div><div class="ssub">% paid on time, avg DTP, late breakdown</div></div>
+      <div style="padding:16px" id="ca-efficiency"></div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="shdr"><div class="stitle">Top Customers by Collections</div><div class="ssub">Ranked by amount collected in selected period</div></div>
+    <div style="overflow-x:auto"><table><thead><tr>
+      <th>Customer</th><th>Plant</th><th class="amt">Collected</th>
+      <th class="amt">Invoices</th><th class="amt">Avg DTP</th>
+      <th class="amt">On Time</th><th class="amt">Late</th>
+    </tr></thead><tbody id="ca-cust-body"></tbody></table></div>
+    <div id="ca-cust-more" class="sm-btn hidden">Show more...</div>
   </div>
 </div>
 
@@ -1292,6 +1392,321 @@ document.getElementById('wow-plant').addEventListener('change', filterWow);
 document.getElementById('wow-search').addEventListener('input', filterWow);
 document.getElementById('wow-more').addEventListener('click', () => { wowLimit += 200; filterWow(); });
 
+
+// ═══════ BILLINGS ═══════
+let D_billings = [];
+let D_collections_m = [];
+
+function billPeriodDates(period) {
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth();
+  switch(period) {
+    case 'MTD': return [new Date(y, m, 1), now];
+    case 'QTD': return [new Date(y, Math.floor(m/3)*3, 1), now];
+    case 'YTD': return [new Date(y, 0, 1), now];
+    case 'L3':  return [new Date(y, m-3, 1), now];
+    case 'L6':  return [new Date(y, m-6, 1), now];
+    case 'L12': return [new Date(y, m-12, 1), now];
+    default:    return [new Date('2009-01-01'), now];
+  }
+}
+
+async function loadBillings() {
+  if (!D_billings.length) {
+    D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc');
+  }
+  if (!D_collections_m.length) {
+    D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc');
+  }
+}
+
+async function renderBillings() {
+  if (!D_billings.length) { ld('Loading billings data...'); await loadBillings(); hideLoader(); }
+  const period = document.getElementById('bill-period').value;
+  const plant  = document.getElementById('bill-plant').value;
+  const groupBy = document.getElementById('bill-group').value;
+  const [from, to] = billPeriodDates(period);
+
+  // Filter
+  let data = D_billings.filter(r => {
+    const d = new Date(r.month + 'T00:00:00');
+    return d >= from && d <= to && (plant === 'All' || r.location === plant);
+  });
+
+  // KPIs
+  const totalBilled = data.reduce((a,r) => a + (+r.billed_amount||0), 0);
+  const totalInvoices = data.reduce((a,r) => a + (+r.invoice_count||0), 0);
+  const locations = [...new Set(data.map(r => r.location))];
+
+  // MoM comparison — current month vs prior month
+  const thisMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-1)[0]);
+  const priorMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-2,-1)[0]);
+  const thisMoTotal = thisMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
+  const priorMoTotal = priorMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
+  const momChg = thisMoTotal - priorMoTotal;
+
+  document.getElementById('bill-kpis').innerHTML = [
+    { l: 'Total Billed', v: fmtK(totalBilled), s: totalInvoices.toLocaleString() + ' invoices', c: 'n' },
+    { l: 'Most Recent Month', v: fmtK(thisMoTotal), s: (momChg >= 0 ? '+' : '') + fmtK(momChg) + ' vs prior month', c: momChg >= 0 ? 'g' : 'r' },
+    { l: 'Avg Monthly Billings', v: fmtK(totalBilled / Math.max(1, [...new Set(data.map(r=>r.month))].length)), s: 'over selected period', c: 'n' },
+    { l: 'Active Plants', v: locations.length.toString(), s: locations.join(' · '), c: 'n' },
+  ].map(k => `<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
+
+  // Populate plant filter
+  const allPlants = [...new Set(D_billings.map(r => r.location))].sort();
+  const bp = document.getElementById('bill-plant'), bv = bp.value;
+  bp.innerHTML = '<option value="All">All Plants</option>' + allPlants.map(p => `<option${p===bv?' selected':''}>${p}</option>`).join('');
+
+  // Group by month or quarter
+  const grouped = {};
+  data.forEach(r => {
+    const d = new Date(r.month + 'T00:00:00');
+    const key = groupBy === 'quarter'
+      ? `Q${Math.floor(d.getMonth()/3)+1} ${d.getFullYear()}`
+      : d.toLocaleDateString('en-US', {month:'short', year:'numeric'});
+    if (!grouped[key]) grouped[key] = { total: 0, byLoc: {} };
+    grouped[key].total += (+r.billed_amount||0);
+    grouped[key].byLoc[r.location] = (grouped[key].byLoc[r.location]||0) + (+r.billed_amount||0);
+  });
+
+  const sortedKeys = Object.keys(grouped).sort((a,b) => {
+    if (groupBy === 'quarter') {
+      const [qa, ya] = a.split(' '); const [qb, yb] = b.split(' ');
+      return ya !== yb ? ya-yb : qa.localeCompare(qb);
+    }
+    return new Date(a) - new Date(b);
+  });
+
+  const allLocs = [...new Set(data.map(r => r.location))].sort();
+  const locColors = { 'Brookville': '#8b2332', 'Kilgore': '#d4a24e', 'Wilkes-Barre': '#4a5568' };
+
+  // Trend chart
+  if (charts.billTrend) charts.billTrend.destroy();
+  document.getElementById('bill-chart-sub').textContent = period + ' · ' + fmtK(totalBilled) + ' total';
+  charts.billTrend = new Chart(document.getElementById('billTrendChart'), {
+    type: 'bar',
+    data: {
+      labels: sortedKeys,
+      datasets: allLocs.map(loc => ({
+        label: loc,
+        data: sortedKeys.map(k => grouped[k]?.byLoc[loc] || 0),
+        backgroundColor: locColors[loc] || '#6b7280',
+        stack: 's'
+      }))
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'bottom'}, datalabels:{display:false} },
+      scales:{ x:{stacked:true,ticks:{font:{size:10}}}, y:{stacked:true,ticks:{callback:v=>fmtK(v)}} }
+    }
+  });
+
+  // Location bars
+  const locTotals = {};
+  data.forEach(r => { locTotals[r.location] = (locTotals[r.location]||0) + (+r.billed_amount||0); });
+  const maxLoc = Math.max(...Object.values(locTotals));
+  document.getElementById('bill-loc-bars').innerHTML = Object.entries(locTotals)
+    .sort((a,b) => b[1]-a[1])
+    .map(([loc, v]) => `<div class="brow">
+      <div class="blbl" title="${loc}">${loc}</div>
+      <div class="btrk"><div class="bseg" style="width:${(v/maxLoc*100).toFixed(1)}%;background:${locColors[loc]||'#6b7280'}"></div></div>
+      <div class="bval">${fmtK(v)}</div>
+    </div>`).join('');
+
+  // Top customers
+  const custTotals = {};
+  data.forEach(r => {
+    const k = r.customer + '|' + r.location;
+    if (!custTotals[k]) custTotals[k] = { customer: r.customer, location: r.location, billed: 0, invoices: 0 };
+    custTotals[k].billed   += (+r.billed_amount||0);
+    custTotals[k].invoices += (+r.invoice_count||0);
+  });
+  document.getElementById('bill-cust-body').innerHTML = Object.values(custTotals)
+    .sort((a,b) => b.billed-a.billed).slice(0,15)
+    .map(r => `<tr><td><strong>${r.customer}</strong></td><td>${r.location}</td><td class="amt">${fmt(r.billed)}</td><td class="amt">${r.invoices.toLocaleString()}</td></tr>`).join('');
+
+  // By salesperson
+  const spTotals = {};
+  data.forEach(r => {
+    const k = (r.salesperson||'Unassigned') + '|' + r.location;
+    if (!spTotals[k]) spTotals[k] = { sp: r.salesperson||'Unassigned', location: r.location, billed: 0, invoices: 0 };
+    spTotals[k].billed   += (+r.billed_amount||0);
+    spTotals[k].invoices += (+r.invoice_count||0);
+  });
+  document.getElementById('bill-sp-body').innerHTML = Object.values(spTotals)
+    .sort((a,b) => b.billed-a.billed).slice(0,15)
+    .map(r => `<tr><td><strong>${r.sp}</strong></td><td>${r.location}</td><td class="amt">${fmt(r.billed)}</td><td class="amt">${r.invoices.toLocaleString()}</td></tr>`).join('');
+}
+
+document.getElementById('bill-period').addEventListener('change', renderBillings);
+document.getElementById('bill-plant').addEventListener('change', renderBillings);
+document.getElementById('bill-group').addEventListener('change', renderBillings);
+
+
+// ═══════ COLLECTIONS ANALYSIS ═══════
+let caLimit = 20;
+
+async function renderCollectionsAnalysis() {
+  if (!D_collections_m.length) { ld('Loading collections data...'); await loadBillings(); hideLoader(); }
+  const period = document.getElementById('ca-period').value;
+  const plant  = document.getElementById('ca-plant').value;
+  const [from, to] = billPeriodDates(period);
+
+  const allPlants = [...new Set(D_collections_m.map(r => r.location))].sort();
+  const cp = document.getElementById('ca-plant'), cv = cp.value;
+  cp.innerHTML = '<option value="All">All Plants</option>' + allPlants.map(p => `<option${p===cv?' selected':''}>${p}</option>`).join('');
+
+  let data = D_collections_m.filter(r => {
+    const d = new Date(r.month + 'T00:00:00');
+    return d >= from && d <= to && (plant === 'All' || r.location === plant);
+  });
+
+  const totalCollected = data.reduce((a,r) => a + (+r.amount_collected||0), 0);
+  const totalInvoices  = data.reduce((a,r) => a + (+r.invoices_collected||0), 0);
+  const totalOnTime    = data.reduce((a,r) => a + (+r.paid_on_time||0), 0);
+  const totalLate      = data.reduce((a,r) => a + (+r.paid_late||0), 0);
+  const avgDTP = totalInvoices > 0
+    ? data.reduce((a,r) => a + (+r.avg_days_to_collect||0) * (+r.invoices_collected||0), 0) / totalInvoices
+    : 0;
+  const onTimePct = totalInvoices > 0 ? (totalOnTime / totalInvoices * 100).toFixed(0) : 0;
+
+  document.getElementById('coll-an-kpis').innerHTML = [
+    { l: 'Total Collected',     v: fmtK(totalCollected), s: totalInvoices.toLocaleString() + ' invoices', c: 'n' },
+    { l: 'Avg Days to Collect', v: Math.round(avgDTP) + 'd', s: 'from invoice date to payment', c: avgDTP > 60 ? 'r' : avgDTP > 45 ? 'n' : 'g' },
+    { l: 'Paid On Time',        v: onTimePct + '%', s: totalOnTime.toLocaleString() + ' of ' + totalInvoices.toLocaleString() + ' invoices', c: +onTimePct < 40 ? 'r' : +onTimePct > 60 ? 'g' : 'n' },
+    { l: 'Paid Late',           v: totalLate.toLocaleString(), s: (totalInvoices > 0 ? (totalLate/totalInvoices*100).toFixed(0) : 0) + '% of invoices', c: totalLate > totalOnTime ? 'r' : 'n' },
+  ].map(k => `<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
+
+  // Monthly collections by location
+  const months = [...new Set(data.map(r => r.month))].sort();
+  const locs   = [...new Set(data.map(r => r.location))].sort();
+  const locColors = { 'Brookville': '#8b2332', 'Kilgore': '#d4a24e', 'Wilkes-Barre': '#4a5568' };
+  const mLabels = months.map(m => { const d = new Date(m+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'}); });
+
+  if (charts.caMonth) charts.caMonth.destroy();
+  charts.caMonth = new Chart(document.getElementById('caMonthChart'), {
+    type: 'bar',
+    data: {
+      labels: mLabels,
+      datasets: locs.map(loc => ({
+        label: loc,
+        data: months.map(m => data.filter(r=>r.month===m&&r.location===loc).reduce((a,r)=>a+(+r.amount_collected||0),0)),
+        backgroundColor: locColors[loc]||'#6b7280', stack: 's'
+      }))
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}
+    }
+  });
+
+  // Avg DTP by location over time
+  if (charts.caDTP) charts.caDTP.destroy();
+  charts.caDTP = new Chart(document.getElementById('caDTPChart'), {
+    type: 'line',
+    data: {
+      labels: mLabels,
+      datasets: locs.map(loc => ({
+        label: loc,
+        data: months.map(m => {
+          const rows = data.filter(r => r.month===m && r.location===loc);
+          const tot = rows.reduce((a,r) => a + (+r.invoices_collected||0), 0);
+          if (!tot) return null;
+          return +(rows.reduce((a,r) => a + (+r.avg_days_to_collect||0)*(+r.invoices_collected||0), 0) / tot).toFixed(1);
+        }),
+        borderColor: locColors[loc]||'#6b7280', backgroundColor: 'transparent',
+        borderWidth: 2, pointRadius: 2, tension: 0.3, spanGaps: true
+      }))
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{ticks:{font:{size:9}}},y:{ticks:{callback:v=>v+'d'},title:{display:true,text:'Days',font:{size:10}}}}
+    }
+  });
+
+  // On-time vs late donut
+  if (charts.caOnTime) charts.caOnTime.destroy();
+  charts.caOnTime = new Chart(document.getElementById('caOnTimeChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['On Time', 'Late (1-30d)', 'Late (31-60d)', 'Late (60+d)'],
+      datasets: [{
+        data: [
+          totalOnTime,
+          data.reduce((a,r)=>a+(+r.paid_late||0),0) - data.reduce((a,r)=>a+(+r.paid_30_plus_late||0),0),
+          // approximate 30-60 late
+          Math.max(0, data.reduce((a,r)=>a+(+r.paid_30_plus_late||0),0) - data.reduce((a,r)=>a+(+r.paid_60_plus_late||0),0)),
+          data.reduce((a,r)=>a+(+r.paid_60_plus_late||0),0)
+        ],
+        backgroundColor: ['#16a34a','#d4a24e','#c4712e','#8b2332'], borderWidth:2
+      }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{position:'right'},datalabels:{formatter:(v,ctx)=>{const t=ctx.dataset.data.reduce((a,b)=>a+b,0);const p=v/t*100;return p>5?p.toFixed(0)+'%':'';},color:'#fff',font:{weight:'bold'}}}
+    }
+  });
+
+  // Efficiency by plant
+  const effByLoc = {};
+  data.forEach(r => {
+    if (!effByLoc[r.location]) effByLoc[r.location] = {collected:0,invoices:0,onTime:0,dtpSum:0};
+    effByLoc[r.location].collected += (+r.amount_collected||0);
+    effByLoc[r.location].invoices  += (+r.invoices_collected||0);
+    effByLoc[r.location].onTime    += (+r.paid_on_time||0);
+    effByLoc[r.location].dtpSum    += (+r.avg_days_to_collect||0) * (+r.invoices_collected||0);
+  });
+  document.getElementById('ca-efficiency').innerHTML = Object.entries(effByLoc)
+    .sort((a,b) => b[1].collected - a[1].collected)
+    .map(([loc, d]) => {
+      const avgD = d.invoices > 0 ? Math.round(d.dtpSum / d.invoices) : 0;
+      const pct  = d.invoices > 0 ? (d.onTime / d.invoices * 100).toFixed(0) : 0;
+      const color = locColors[loc]||'#6b7280';
+      return `<div style="margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <strong style="color:${color}">${loc}</strong>
+          <span style="font-size:12px;color:var(--text2)">${fmtK(d.collected)} collected</span>
+        </div>
+        <div style="font-size:12px;display:flex;gap:16px;color:var(--text2)">
+          <span>Avg DTP: <strong style="color:var(--text)">${avgD}d</strong></span>
+          <span>On Time: <strong style="color:${+pct>50?'var(--green)':'var(--red)'}">${pct}%</strong></span>
+          <span>Invoices: <strong style="color:var(--text)">${d.invoices.toLocaleString()}</strong></span>
+        </div>
+      </div>`;
+    }).join('');
+
+  // Top customers
+  const custMap = {};
+  data.forEach(r => {
+    const k = r.customer+'|'+r.location;
+    if (!custMap[k]) custMap[k] = { customer:r.customer, location:r.location, collected:0, invoices:0, onTime:0, late:0, dtpSum:0 };
+    custMap[k].collected += (+r.amount_collected||0);
+    custMap[k].invoices  += (+r.invoices_collected||0);
+    custMap[k].onTime    += (+r.paid_on_time||0);
+    custMap[k].late      += (+r.paid_late||0);
+    custMap[k].dtpSum    += (+r.avg_days_to_collect||0) * (+r.invoices_collected||0);
+  });
+  const custList = Object.values(custMap).sort((a,b) => b.collected-a.collected);
+  document.getElementById('ca-cust-body').innerHTML = custList.slice(0, caLimit)
+    .map(c => {
+      const avgD = c.invoices > 0 ? Math.round(c.dtpSum/c.invoices) : 0;
+      const otPct = c.invoices > 0 ? (c.onTime/c.invoices*100).toFixed(0) : 0;
+      return `<tr>
+        <td><strong>${c.customer}</strong></td><td>${c.location}</td>
+        <td class="amt">${fmt(c.collected)}</td>
+        <td class="amt">${c.invoices.toLocaleString()}</td>
+        <td class="amt" style="${avgD>60?'color:var(--red)':''}">${avgD}d</td>
+        <td class="amt" style="color:var(--green)">${c.onTime.toLocaleString()}</td>
+        <td class="amt" style="${c.late>c.onTime?'color:var(--red)':''}">${c.late.toLocaleString()}</td>
+      </tr>`;
+    }).join('');
+  const more = document.getElementById('ca-cust-more');
+  if (custList.length > caLimit) { more.classList.remove('hidden'); more.textContent = 'Show more... (' + (custList.length-caLimit) + ' remaining)'; }
+  else more.classList.add('hidden');
+}
+
+document.getElementById('ca-period').addEventListener('change', renderCollectionsAnalysis);
+document.getElementById('ca-plant').addEventListener('change', renderCollectionsAnalysis);
+document.getElementById('ca-cust-more').addEventListener('click', () => { caLimit += 20; renderCollectionsAnalysis(); });
+
 // ═══════ Q&A ═══════
 function addMsg(txt, isUser) {
   const d = document.getElementById('qamsgs');
@@ -1373,6 +1788,9 @@ function answerQ(q) {
 function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+  // Lazy-load on first visit
+  if (name === 'billings') renderBillings();
+  if (name === 'collections-analysis') renderCollectionsAnalysis();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
