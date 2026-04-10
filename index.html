@@ -181,8 +181,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <span id="userBadge" class="user-badge" style="display:none"><span id="userEmail"></span><button class="signout-btn" onclick="signOut()">Sign out</button></span>
     <button class="rbtn" onclick="refreshAll()">&#8635; Refresh</button>
     <button class="rbtn" style="background:var(--bg2);color:var(--accent);border:1px solid var(--accent)" onclick="sendEmail()">&#128231; Send Digest</button>
-    <button class="rbtn" style="background:var(--bg2);color:var(--accent);border:1px solid var(--accent)" onclick="document.getElementById('csvUpload').click()">&#128196; Upload CSV</button>
-    <input type="file" id="csvUpload" accept=".csv" style="display:none">
   </div>
 </div>
 
@@ -1415,38 +1413,6 @@ document.getElementById('btt').addEventListener('click', () => scrollTo({ top: 0
 const savedAuthor = localStorage.getItem('ar_author');
 if (savedAuthor) document.getElementById('nauthor').value = savedAuthor;
 
-
-// ═══════ CSV UPLOAD ═══════
-document.getElementById('csvUpload').addEventListener('change', async (e) => {
-  const file = e.target.files[0];
-  if (!file) return;
-  if (!confirm(`Upload ${file.name} (${(file.size/1024/1024).toFixed(1)} MB) to Supabase?`)) return;
-
-  ld('Uploading CSV...');
-  document.getElementById('loader').style.display = 'flex';
-
-  try {
-    const formData = new FormData();
-    formData.append('file', file);
-    const resp = await fetch('https://oirrixsqzuufgqbxgucs.supabase.co/functions/v1/load-ar-csv', {
-      method: 'POST',
-      headers: { 'Authorization': 'Bearer ' + (currentSession?.access_token || ANON) },
-      body: formData
-    });
-    const result = await resp.json();
-    document.getElementById('loader').style.display = 'none';
-    if (result.ok) {
-      alert(`✓ Uploaded successfully!\n${result.rows_processed.toLocaleString()} rows processed\n${result.weeks_loaded?.length || 0} weeks loaded\nDashboard refreshing...`);
-      await loadAll();
-    } else {
-      alert('Upload failed: ' + result.error);
-    }
-  } catch(err) {
-    document.getElementById('loader').style.display = 'none';
-    alert('Upload error: ' + err.message);
-  }
-  e.target.value = ''; // reset so same file can be re-uploaded
-});
 
 // ═══════ AUTH ═══════
 async function initAuth() {
