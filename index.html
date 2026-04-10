@@ -716,6 +716,27 @@ async function get(path) {
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
+
+// Paginated fetch — works around Supabase free tier 1000-row cap on views
+async function getAll(basePath, pageSize = 1000) {
+  let allRows = [];
+  let offset  = 0;
+  while (true) {
+    const sep  = basePath.includes('?') ? '&' : '?';
+    const path = basePath + sep + 'limit=' + pageSize + '&offset=' + offset;
+    const r    = await fetch(SB + '/rest/v1/' + path, {
+      headers: { ...authHeaders(), 'Prefer': 'count=exact' }
+    });
+    if (!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    allRows = allRows.concat(rows);
+    if (rows.length < pageSize) break;
+    offset += pageSize;
+    if (offset > 20000) break;
+  }
+  return allRows;
+}
+
 async function post(path, body) {
   return fetch(SB + '/rest/v1/' + path, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
 }
@@ -2088,14 +2109,15 @@ async function loadO2CData(forceReload = false) {
   try {
     // Supabase REST order syntax: column.asc / column.desc
     // Multiple columns: order=col1.asc,col2.asc
-    const [rev, book, ar, cdtp, oar, sdtp, fcInv] = await Promise.all([
+    const [rev, book, ar, cdtp, oar, sdtp, fcInv, arSum] = await Promise.all([
       get('v_o2c_monthly_revenue?select=*&order=location.asc,month.asc'),
       get('v_o2c_monthly_bookings?select=*&order=location.asc,month.asc'),
       get('v_o2c_monthly_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      get('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc&limit=5000'),
+      get('vw_ar_summary?select=location,total_ar'),
+      getAll('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
     ]);
     O2C.revenue   = rev;
     O2C.bookings  = book;
@@ -2104,11 +2126,12 @@ async function loadO2CData(forceReload = false) {
     O2C.openAr    = oar;
     O2C.siteDtp   = sdtp;
     O2C.fcInvoices = fcInv;
+    O2C.arSummary  = arSum;
     o2cLoaded = true;
     console.log('O2C loaded:',
       'rev:', rev.length, 'book:', book.length, 'ar:', ar.length,
       'dtp:', cdtp.length, 'openAr:', oar.length, 'siteDtp:', sdtp.length,
-      'fcInvoices:', fcInv.length
+      'fcInvoices:', fcInv.length, 'arSummary:', arSum.length
     );
   } catch(e) {
     console.error('O2C load error:', e);
@@ -2244,7 +2267,7 @@ async function renderWaterfall() {
     {l:'Total Billings',   v:fmtK(totB),  s:'Gross invoiced',       c:'n'},
     {l:'Total Collections',v:fmtK(totC),  s:'BV + KG only',         c:'g'},
     {l:'Collection Rate',  v:effPct.toFixed(1)+'%', s:'Collections ÷ Billings', c:effPct>=100?'g':'n'},
-    {l:'Ending AR Balance',v:fmtK(lastBal),s:'Most recent month',   c:'n'},
+    {l:'Ending AR Balance',v:fmtK((O2C.arSummary||[]).filter(r=>entity==='all'||r.location===entity).reduce((s,r)=>s+(+r.total_ar||0),0)),s:'Current open AR (live)',c:'n'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   if (charts.wf) charts.wf.destroy();
