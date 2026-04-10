@@ -1017,7 +1017,7 @@ function renderOV() {
   const NI = s.reduce((a, r) => a + (+r.num_invoices || 0), 0);
   const NC = s.reduce((a, r) => a + (+r.num_customers || 0), 0);
 
-  document.  // WoW delta from v_weekly_trend
+  // WoW delta from v_weekly_trend
   const trendSorted = [...(D.trend||[])].sort((a,b) => a.week > b.week ? 1 : -1);
   const wkCurr  = trendSorted[trendSorted.length - 1];
   const wkPrev  = trendSorted[trendSorted.length - 2];
@@ -1034,7 +1034,7 @@ function renderOV() {
     const color = isBad ? 'var(--red)' : 'var(--green)';
     return ' <span style="font-size:11px;font-weight:600;color:'+color+'">'+(isUp?'↑':'↓')+' '+fmtK(Math.abs(val))+' WoW</span>';
   };
-  getElementById('ovkpis').innerHTML = [
+  document.getElementById('ovkpis').innerHTML = [
     { l: 'Total Open AR', v: fmtK(T), s: NI + ' invoices · ' + NC + ' customers' + wowBadge(wowT, false), c: 'n' },
     { l: 'Past Due', v: fmtK(PD), s: pct(PD,T) + ' of AR' + wowBadge(wowPD, true), c: PD/T > 0.4 ? 'r' : 'n' },
     { l: '60+ Days', v: fmtK(SP), s: pct(SP,T) + ' of AR', c: SP/T > 0.12 ? 'r' : 'n' },
