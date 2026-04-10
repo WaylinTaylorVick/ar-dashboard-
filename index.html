@@ -1934,8 +1934,10 @@ function switchTab(name) {
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
   // Lazy-load on first visit
-  if (name === 'billings') renderBillings();
+  if (name === 'billings')             renderBillings();
   if (name === 'collections-analysis') renderCollectionsAnalysis();
+  if (name === 'o2c')                  renderO2C();
+  if (name === 'coll-forecast')        renderForecast();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -2075,11 +2077,11 @@ async function loadO2CData() {
   document.getElementById('ldmsg').textContent = 'Loading O2C data…';
   try {
     const [rev, book, ar, cdtp, oar, sdtp] = await Promise.all([
-      get('v_o2c_shipments_monthly?select=*&order=location,month'),
-      get('v_o2c_bookings_monthly?select=*&order=location,month'),
-      get('v_o2c_ar_monthly?select=*&order=location,month'),
+      get('v_o2c_monthly_revenue?select=*&order=location,month'),
+      get('v_o2c_monthly_bookings?select=*&order=location,month'),
+      get('v_o2c_monthly_ar?select=*&order=location,month'),
       get('v_o2c_customer_dtp?select=*&order=location,invoice_count.desc'),
-      get('v_o2c_open_ar?select=*&order=location,billing_month'),
+      get('v_o2c_open_ar?select=*&order=location,month'),
       get('v_o2c_site_dtp?select=*&order=location'),
     ]);
     O2C.revenue  = rev;
@@ -2512,29 +2514,13 @@ function renderForecastTable() {
   more.textContent = 'Show more… ('+(rows.length - fcTblLimit)+' remaining)';
 }
 
-// ═══════════════════════════════════════════════════════
-// HOOK INTO switchTab — invalidate cache on refresh
-// ═══════════════════════════════════════════════════════
-const _origSwitchTab = switchTab;
-function switchTab(name) {
-  _origSwitchTab(name);
-  if (name === 'o2c')            { renderO2C(); }
-  if (name === 'coll-forecast')  { renderForecast(); }
-}
-
-// Invalidate O2C cache when main data is refreshed
+// ── O2C cache invalidation on refresh ─────────────────
+// (tab switching handled in the main switchTab above)
 const _origRefreshAll = refreshAll;
 async function refreshAll() {
-  o2cLoaded   = false;
-  o2cRendered = false;
+  o2cLoaded = false;
   await _origRefreshAll();
 }
-
-// Re-bind all tabs with updated switchTab
-document.querySelectorAll('.tab').forEach(t => {
-  t.replaceWith(t.cloneNode(true));
-});
-document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', ()=>switchTab(t.dataset.tab)));
 
 
 </script>
