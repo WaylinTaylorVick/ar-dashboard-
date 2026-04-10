@@ -2076,13 +2076,15 @@ async function loadO2CData() {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('ldmsg').textContent = 'Loading O2C data…';
   try {
+    // Supabase REST order syntax: column.asc / column.desc
+    // Multiple columns: order=col1.asc,col2.asc
     const [rev, book, ar, cdtp, oar, sdtp] = await Promise.all([
-      get('v_o2c_monthly_revenue?select=*&order=location,month'),
-      get('v_o2c_monthly_bookings?select=*&order=location,month'),
-      get('v_o2c_monthly_ar?select=*&order=location,month'),
-      get('v_o2c_customer_dtp?select=*&order=location,invoice_count.desc'),
-      get('v_o2c_open_ar?select=*&order=location,month'),
-      get('v_o2c_site_dtp?select=*&order=location'),
+      get('v_o2c_monthly_revenue?select=*&order=location.asc,month.asc'),
+      get('v_o2c_monthly_bookings?select=*&order=location.asc,month.asc'),
+      get('v_o2c_monthly_ar?select=*&order=location.asc,month.asc'),
+      get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
+      get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
+      get('v_o2c_site_dtp?select=*&order=location.asc'),
     ]);
     O2C.revenue  = rev;
     O2C.bookings = book;
@@ -2091,9 +2093,21 @@ async function loadO2CData() {
     O2C.openAr   = oar;
     O2C.siteDtp  = sdtp;
     o2cLoaded = true;
+    console.log('O2C loaded:',
+      'rev:', rev.length, 'book:', book.length, 'ar:', ar.length,
+      'dtp:', cdtp.length, 'openAr:', oar.length, 'siteDtp:', sdtp.length
+    );
   } catch(e) {
     console.error('O2C load error:', e);
-    document.getElementById('ldmsg').textContent = 'Error loading O2C data: ' + e.message;
+    // Show error visibly on the panel instead of just in loader text
+    const errHtml = '<div style="padding:32px;color:#dc2626;font-size:13px">'
+      + '<strong>Error loading O2C data:</strong> ' + e.message
+      + '<br><br>Check browser console for details.</div>';
+    const panels = ['panel-o2c','panel-coll-forecast'];
+    panels.forEach(id => {
+      const p = document.getElementById(id);
+      if (p) p.insertAdjacentHTML('afterbegin', errHtml);
+    });
   }
   document.getElementById('loader').style.display = 'none';
 }
