@@ -596,14 +596,12 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 <!-- ══════════════ COLLECTIONS FORECAST ══════════════ -->
 <div class="panel" id="panel-coll-forecast">
   <div style="background:rgba(139,35,50,.04);border:1px solid rgba(139,35,50,.15);border-left:4px solid var(--accent);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;line-height:1.6;color:var(--text2)">
-    <strong style="color:var(--text)">Methodology:</strong>
-    Each open invoice is individually forecasted: <strong>Expected Date = Invoice Date + Customer Avg DTP</strong>.
-    Customers with <strong>3+ paid invoices</strong> use their own historical avg &amp; std dev.
-    New or infrequent customers fall back to the site average (BV: 56d · KG: 52d · WB: 68d).
-    Scenarios: <strong>Optimistic</strong> = avg &minus; 0.5&sigma; &nbsp;|&nbsp;
-    <strong>Base</strong> = avg &nbsp;|&nbsp;
-    <strong>Conservative</strong> = avg + 0.5&sigma;
-    &nbsp;· Base dates shown in <span style="color:var(--red);font-weight:600">red</span> are already past due.
+    <strong style="color:var(--text)">Methodology — Two-layer model:</strong>
+    &nbsp;<strong>Current invoices</strong> (not yet overdue): Expected date = MAX(due_date, invoice_date + customer avg DTP). Each invoice lands in a specific forecast week.
+    &nbsp;<strong>Overdue invoices</strong>: Distributed across near-term weeks using a decay curve — heavier weight in early weeks, tapering off. Conservative scenario applies a 15% haircut for potential uncollectables.
+    &nbsp;Customers with <strong>3+ paid invoices</strong> use their own DTP. Others fall back to site avg (BV: 56d · KG: 52d · WB: 68d).
+    &nbsp;Scenarios: <strong>Optimistic</strong> = avg &minus; 0.5&sigma; &nbsp;|&nbsp; <strong>Base</strong> = avg &nbsp;|&nbsp; <strong>Conservative</strong> = avg + 0.5&sigma; &minus; 15% haircut on overdue.
+    &nbsp;Solid bars = current invoices &nbsp;|&nbsp; Faded bars = overdue recovery. Base dates in <span style="color:var(--red);font-weight:600">red</span> in the table are past due.
   </div>
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Site</label>
@@ -2315,128 +2313,239 @@ function wkLabel(s) {
 }
 
 // Build aggregate forecast rows from open AR (site-level, by month)
-function buildInvoiceForecastRows(scenario, siteFilter) {
-  // Use individual invoice records from v_forecast_open_invoices
-  // Expected dates are pre-computed by Postgres per scenario
+
+// ═══════════════════════════════════════════════════════
+// COLLECTIONS FORECAST — TWO-LAYER MODEL
+//
+// Layer 1 — Current invoices:
+//   expected_date = MAX(due_date, invoice_date + avg_dtp)
+//   Scenario ± 0.5σ applied. Invoice lands in a specific week.
+//
+// Layer 2 — Overdue invoices:
+//   Distributed across near-term weeks using a decay curve.
+//   Optimistic: front-loaded (faster recovery assumed)
+//   Base:       standard decay
+//   Conservative: spread further out + 15% haircut (some uncollectable)
+//
+// Decay weights by scenario (sum to 1.0):
+//   Week 1  2  3  4  5  6+
+// Opt  .40 .25 .17 .10 .05 .03
+// Base .30 .22 .18 .14 .10 .06
+// Cons .20 .18 .17 .15 .12 .18  (then multiply by 0.85 haircut)
+// ═══════════════════════════════════════════════════════
+
+const DECAY_WEIGHTS = {
+  optimistic:   [0.40, 0.25, 0.17, 0.10, 0.05, 0.03],
+  base:         [0.30, 0.22, 0.18, 0.14, 0.10, 0.06],
+  conservative: [0.20, 0.18, 0.17, 0.15, 0.12, 0.18],
+};
+const OVERDUE_HAIRCUT = { optimistic: 1.0, base: 1.0, conservative: 0.85 };
+
+function buildForecastLayers(scenario, siteFilter, weeks) {
+  const invs = (O2C.fcInvoices||[])
+    .filter(r => siteFilter === 'all' || r.location === siteFilter)
+    .filter(r => +r.invoice_balance > 0);
+
   const dateField = scenario === 'optimistic'   ? 'expected_date_optimistic'
                   : scenario === 'conservative'  ? 'expected_date_conservative'
                   :                               'expected_date_base';
-  const weekField = scenario === 'optimistic'   ? 'week_optimistic'
+  const wkField   = scenario === 'optimistic'   ? 'week_optimistic'
                   : scenario === 'conservative'  ? 'week_conservative'
                   :                               'week_base';
 
-  return (O2C.fcInvoices||[])
-    .filter(r => siteFilter === 'all' || r.location === siteFilter)
-    .filter(r => +r.invoice_balance > 0)
-    .map(r => ({
-      invoice_id:  r.ar_invoice_id,
-      customer:    r.consolidated_customer || '—',
-      location:    r.location,
-      balance:     +r.invoice_balance,
-      invoice_date: r.invoice_date,
-      avg:         +r.avg_days,
-      std:         +r.std_days,
-      src:         r.dtp_source,
-      expectedDate: r[dateField],
-      week:         r[weekField],
-    }));
+  // ── Layer 1: current invoices → specific week ──
+  const currentByWeek = {};
+  weeks.forEach(w => currentByWeek[w] = {});
+
+  invs.filter(r => r.invoice_type === 'current').forEach(r => {
+    const wk = r[wkField];
+    if (!wk) return;
+    if (!currentByWeek[wk]) currentByWeek[wk] = {};
+    currentByWeek[wk][r.location] = (currentByWeek[wk][r.location] || 0) + (+r.invoice_balance);
+  });
+
+  // ── Layer 2: overdue invoices → decay distribution ──
+  const overdueByWeek = {};
+  weeks.forEach(w => overdueByWeek[w] = {});
+
+  const weights  = DECAY_WEIGHTS[scenario];
+  const haircut  = OVERDUE_HAIRCUT[scenario];
+  const locs     = ['Brookville', 'Kilgore', 'Wilkes-Barre'];
+
+  locs.forEach(loc => {
+    const overdueInvs = invs.filter(r => r.invoice_type === 'overdue' && r.location === loc);
+    if (!overdueInvs.length) return;
+    const totalOverdue = overdueInvs.reduce((s, r) => s + (+r.invoice_balance), 0) * haircut;
+
+    weeks.slice(0, weights.length).forEach((wk, i) => {
+      const wt = weights[i] || weights[weights.length - 1];
+      if (!overdueByWeek[wk]) overdueByWeek[wk] = {};
+      overdueByWeek[wk][loc] = (overdueByWeek[wk][loc] || 0) + totalOverdue * wt;
+    });
+    // Any remaining weight for weeks beyond the array goes into the last week
+    const usedWeeks = Math.min(weeks.length, weights.length);
+    if (weeks.length > weights.length) {
+      const remainder = weights.slice(usedWeeks).reduce((s, w) => s + w, 0);
+      const lastWk = weeks[weights.length - 1];
+      if (lastWk && overdueByWeek[lastWk]) {
+        overdueByWeek[lastWk][loc] = (overdueByWeek[lastWk][loc] || 0) + totalOverdue * remainder;
+      }
+    }
+  });
+
+  return { currentByWeek, overdueByWeek };
 }
 
-// Keep old name as alias for any other callers
+// Kept for backwards compat with renderForecast KPI calcs
+function buildInvoiceForecastRows(scenario, siteFilter) {
+  const dateField = scenario === 'optimistic'   ? 'expected_date_optimistic'
+                  : scenario === 'conservative'  ? 'expected_date_conservative'
+                  :                               'expected_date_base';
+  const wkField   = scenario === 'optimistic'   ? 'week_optimistic'
+                  : scenario === 'conservative'  ? 'week_conservative'
+                  :                               'week_base';
+  return (O2C.fcInvoices||[])
+    .filter(r => (siteFilter === 'all' || r.location === siteFilter) && +r.invoice_balance > 0)
+    .map(r => ({
+      invoice_id:   r.ar_invoice_id,
+      customer:     r.consolidated_customer || '—',
+      location:     r.location,
+      balance:      +r.invoice_balance,
+      invoice_date: r.invoice_date,
+      invoice_type: r.invoice_type,
+      avg:          +r.avg_days,
+      std:          +r.std_days,
+      src:          r.dtp_source,
+      expectedDate: r[dateField],
+      week:         r[wkField],
+    }));
+}
 function buildSiteForecastRows(scenario, siteFilter) {
   return buildInvoiceForecastRows(scenario, siteFilter);
 }
+
 
 async function renderForecast() {
   await loadO2CData();
   fcTblLimit = 50;
 
-  const scenario  = document.getElementById('fc-scenario').value;
-  const site      = document.getElementById('fc-site').value;
-  const weeksOut  = parseInt(document.getElementById('fc-weeks').value);
-  const weeks     = buildForecastWeeks(weeksOut);
-  const wkLabels  = weeks.map(wkLabel);
+  const scenario = document.getElementById('fc-scenario').value;
+  const site     = document.getElementById('fc-site').value;
+  const weeksOut = parseInt(document.getElementById('fc-weeks').value);
+  const weeks    = buildForecastWeeks(weeksOut);
+  const wkLabels = weeks.map(wkLabel);
 
-  // Build rows for all 3 scenarios
-  const rowsOpt  = buildSiteForecastRows('optimistic',   site);
-  const rowsBase = buildSiteForecastRows('base',         site);
-  const rowsCons = buildSiteForecastRows('conservative', site);
-  const baseRows = scenario==='optimistic'?rowsOpt : scenario==='conservative'?rowsCons : rowsBase;
+  // ── KPI calculations ──
+  const allInvs    = (O2C.fcInvoices||[]).filter(r => site==='all'||r.location===site);
+  const overdueInvs = allInvs.filter(r => r.invoice_type === 'overdue');
+  const currentInvs = allInvs.filter(r => r.invoice_type === 'current');
+  const totalBal    = allInvs.reduce((s,r)=>s+(+r.invoice_balance),0);
+  const overdueBal  = overdueInvs.reduce((s,r)=>s+(+r.invoice_balance),0);
+  const haircut     = OVERDUE_HAIRCUT[scenario];
 
-  // KPIs
-  const total  = baseRows.reduce((s,r)=>s+r.balance, 0);
-  const next4w = baseRows.filter(r=>weeks.slice(0,4).includes(r.week)).reduce((s,r)=>s+r.balance,0);
-  const next8w = baseRows.filter(r=>weeks.slice(0,8).includes(r.week)).reduce((s,r)=>s+r.balance,0);
-  const beyond = baseRows.filter(r=>!weeks.includes(r.week)).reduce((s,r)=>s+r.balance,0);
-  const siteAvgDisplay = site==='all'
-    ? 'Multi-site weighted'
-    : (getSiteDtp(site).avg.toFixed(0)+'d site avg');
+  // Build layers for base scenario (for KPI calc)
+  const { currentByWeek, overdueByWeek } = buildForecastLayers(scenario, site, weeks);
+  const next4wCurrent  = weeks.slice(0,4).reduce((s,w)=>s+Object.values(currentByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
+  const next4wOverdue  = weeks.slice(0,4).reduce((s,w)=>s+Object.values(overdueByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
+  const next4w         = next4wCurrent + next4wOverdue;
+  const next4w8w       = weeks.slice(4,8).reduce((s,w)=>s
+    +Object.values(currentByWeek[w]||{}).reduce((a,b)=>a+b,0)
+    +Object.values(overdueByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
 
   document.getElementById('fc-kpis').innerHTML = [
-    {l:'Total Open AR',         v:fmtK(total),       s:site==='all'?'All sites':site,c:'n'},
-    {l:'Expected Next 4 Wks',   v:fmtK(next4w),      s:total>0?(next4w/total*100).toFixed(0)+'% of open AR':'—',c:'g'},
-    {l:'Expected Wks 5–8',      v:fmtK(next8w-next4w),s:'Incremental',c:'n'},
-    {l:'Beyond Window',         v:fmtK(beyond),      s:'After '+weeksOut+'w horizon',c:beyond>0?'r':'n'},
-    {l:'DTP Reference',         v:siteAvgDisplay,    s:'Base scenario avg',c:'n'},
+    {l:'Total Open AR',        v:fmtK(totalBal),              s:(site==='all'?'All sites':site),      c:'n'},
+    {l:'Overdue Balance',      v:fmtK(overdueBal),            s:overdueInvs.length+' invoices past due', c:'r'},
+    {l:'Current Pipeline',     v:fmtK(totalBal - overdueBal), s:currentInvs.length+' invoices',       c:'n'},
+    {l:'Expected Next 4 Wks',  v:fmtK(next4w),                s:(totalBal?(next4w/totalBal*100).toFixed(0)+'% of AR':'—'), c:'g'},
+    {l:'Expected Wks 5–8',     v:fmtK(next4w8w),              s:'Incremental',                        c:'n'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   document.getElementById('fc-chart-sub').textContent =
-    scenario.charAt(0).toUpperCase()+scenario.slice(1)+' · '+(site==='all'?'All sites':site);
+    scenario.charAt(0).toUpperCase()+scenario.slice(1)+' · '+(site==='all'?'All sites':site)
+    +' · Striped = overdue recovery';
 
-  // Weekly stacked bar by site
-  const siteLocs = site==='all'?['Brookville','Kilgore','Wilkes-Barre']:[site];
+  const siteLocs = site==='all' ? ['Brookville','Kilgore','Wilkes-Barre'] : [site];
+
+  // ── Weekly chart: stacked current + overdue per site ──
   if (charts.fcWeek) charts.fcWeek.destroy();
   charts.fcWeek = new Chart(document.getElementById('fcWeekChart'), {
-    type:'bar',
-    data:{
+    type: 'bar',
+    data: {
       labels: wkLabels,
-      datasets: siteLocs.map(loc=>({
-        label: loc,
-        data:  weeks.map(w=>baseRows.filter(r=>r.location===loc&&r.week===w).reduce((s,r)=>s+r.balance,0)),
-        backgroundColor: LOC_COLORS[loc]||'#6b7280',
-        stack:'s'
-      }))
-    },
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{stacked:true,ticks:{font:{size:9},maxRotation:45}},
-              y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}}
-  });
-
-  // Cumulative — all 3 scenarios
-  function cumSum(rows,wks){ let t=0; return wks.map(w=>{t+=rows.filter(r=>r.week===w).reduce((s,r)=>s+r.balance,0);return t;}); }
-  if (charts.fcCum) charts.fcCum.destroy();
-  charts.fcCum = new Chart(document.getElementById('fcCumChart'), {
-    type:'line',
-    data:{
-      labels: wkLabels,
-      datasets:[
-        {label:'Optimistic',   data:cumSum(rowsOpt, weeks), borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',  fill:true, tension:.3,pointRadius:2,borderWidth:2},
-        {label:'Base',         data:cumSum(rowsBase,weeks), borderColor:'#4a5568',backgroundColor:'rgba(74,85,104,.08)',  fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[4,3]},
-        {label:'Conservative', data:cumSum(rowsCons,weeks), borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.05)', fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[2,4]},
+      datasets: [
+        // Current invoices — solid
+        ...siteLocs.map(loc => ({
+          label:           loc + ' (current)',
+          data:            weeks.map(w => currentByWeek[w]?.[loc] || 0),
+          backgroundColor: LOC_COLORS[loc] || '#6b7280',
+          stack:           'total',
+          borderRadius:    2,
+        })),
+        // Overdue recovery — same color, pattern via lower opacity + border
+        ...siteLocs.map(loc => ({
+          label:           loc + ' (overdue)',
+          data:            weeks.map(w => overdueByWeek[w]?.[loc] || 0),
+          backgroundColor: (LOC_COLORS[loc] || '#6b7280') + '55',  // 33% opacity
+          borderColor:     LOC_COLORS[loc] || '#6b7280',
+          borderWidth:     1,
+          borderDash:      [4, 2],
+          stack:           'total',
+        })),
       ]
     },
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } }, datalabels: { display: false } },
+      scales: { x: { stacked: true, ticks: { font: { size: 9 }, maxRotation: 45 } },
+                y: { stacked: true, ticks: { callback: v => fmtK(v) } } }
+    }
   });
 
-  // All-sites weekly side-by-side
+  // ── Cumulative chart — all 3 scenarios ──
+  function cumTotal(scen) {
+    const { currentByWeek: c, overdueByWeek: o } = buildForecastLayers(scen, site, weeks);
+    let t = 0;
+    return weeks.map(w => {
+      t += siteLocs.reduce((s, loc) => s + (c[w]?.[loc]||0) + (o[w]?.[loc]||0), 0);
+      return t;
+    });
+  }
+  if (charts.fcCum) charts.fcCum.destroy();
+  charts.fcCum = new Chart(document.getElementById('fcCumChart'), {
+    type: 'line',
+    data: {
+      labels: wkLabels,
+      datasets: [
+        { label: 'Optimistic',   data: cumTotal('optimistic'),   borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)',  fill: true,  tension: .3, pointRadius: 2, borderWidth: 2 },
+        { label: 'Base',         data: cumTotal('base'),         borderColor: '#4a5568', backgroundColor: 'rgba(74,85,104,.08)', fill: false, tension: .3, pointRadius: 2, borderWidth: 2, borderDash: [4,3] },
+        { label: 'Conservative', data: cumTotal('conservative'), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,.05)', fill: false, tension: .3, pointRadius: 2, borderWidth: 2, borderDash: [2,4] },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
+      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { callback: v => fmtK(v) } } }
+    }
+  });
+
+  // ── By-site weekly chart — current only, cleaner read ──
   if (charts.fcSite) charts.fcSite.destroy();
   charts.fcSite = new Chart(document.getElementById('fcSiteChart'), {
-    type:'bar',
-    data:{
+    type: 'bar',
+    data: {
       labels: wkLabels,
-      datasets:['Brookville','Kilgore','Wilkes-Barre'].map(loc=>({
-        label: loc,
-        data:  weeks.map(w=>rowsBase.filter(r=>r.location===loc&&r.week===w).reduce((s,r)=>s+r.balance,0)),
-        backgroundColor: LOC_COLORS[loc]||'#6b7280',
-        borderRadius:2,
+      datasets: ['Brookville','Kilgore','Wilkes-Barre'].map(loc => ({
+        label:           loc,
+        data:            weeks.map(w => (currentByWeek[w]?.[loc]||0) + (overdueByWeek[w]?.[loc]||0)),
+        backgroundColor: LOC_COLORS[loc] || '#6b7280',
+        borderRadius:    2,
       }))
     },
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
+      scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } }, y: { ticks: { callback: v => fmtK(v) } } }
+    }
   });
 
   renderForecastTable();
