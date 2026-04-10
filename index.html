@@ -1427,17 +1427,21 @@ function quickNote(customer) {
 // ═══════ NEAR BOUNDARY ═══════
 function renderNearBoundary() {
   const near = D.near || [];
+  const sec = document.getElementById('nearBdrySection');
+  if (!sec) return; // element not present in this version of the dashboard
   if (!near.length) {
-    document.getElementById('nearBdrySection').style.display = 'none';
+    sec.style.display = 'none';
     return;
   }
-  document.getElementById('nearBdrySection').style.display = '';
+  sec.style.display = '';
   const total = near.reduce((a, r) => a + (+r.balance || 0), 0);
-  document.getElementById('nearBdrySub').textContent =
-    near.length + ' invoices — ' + fmtK(total) + ' at risk of aging this week';
+  const sub  = document.getElementById('nearBdrySub');
+  const body = document.getElementById('nearBody');
+  if (!sub || !body) return;
+  sub.textContent = near.length + ' invoices — ' + fmtK(total) + ' at risk of aging this week';
 
   const bucketOrder = { '90+': 1, '61-90': 2, '31-60': 3, '1-30': 4 };
-  document.getElementById('nearBody').innerHTML = near.map(r => {
+  body.innerHTML = near.map(r => {
     const daysLeft = +r.days_until_next_bucket;
     const urgency  = daysLeft <= 2 ? 'color:var(--red);font-weight:700' : daysLeft <= 5 ? 'color:var(--amber);font-weight:600' : '';
     const nextBucketColor = r.next_bucket === '90+' ? 'b4' : r.next_bucket === '61-90' ? 'b3' : r.next_bucket === '31-60' ? 'b2' : 'b1';
@@ -2076,13 +2080,15 @@ async function loadO2CData() {
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('ldmsg').textContent = 'Loading O2C data…';
   try {
+    // Supabase REST order syntax: column.asc / column.desc
+    // Multiple columns: order=col1.asc,col2.asc
     const [rev, book, ar, cdtp, oar, sdtp] = await Promise.all([
-      get('v_o2c_monthly_revenue?select=*&order=location,month'),
-      get('v_o2c_monthly_bookings?select=*&order=location,month'),
-      get('v_o2c_monthly_ar?select=*&order=location,month'),
-      get('v_o2c_customer_dtp?select=*&order=location,invoice_count.desc'),
-      get('v_o2c_open_ar?select=*&order=location,month'),
-      get('v_o2c_site_dtp?select=*&order=location'),
+      get('v_o2c_monthly_revenue?select=*&order=location.asc,month.asc'),
+      get('v_o2c_monthly_bookings?select=*&order=location.asc,month.asc'),
+      get('v_o2c_monthly_ar?select=*&order=location.asc,month.asc'),
+      get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
+      get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
+      get('v_o2c_site_dtp?select=*&order=location.asc'),
     ]);
     O2C.revenue  = rev;
     O2C.bookings = book;
@@ -2091,9 +2097,21 @@ async function loadO2CData() {
     O2C.openAr   = oar;
     O2C.siteDtp  = sdtp;
     o2cLoaded = true;
+    console.log('O2C loaded:',
+      'rev:', rev.length, 'book:', book.length, 'ar:', ar.length,
+      'dtp:', cdtp.length, 'openAr:', oar.length, 'siteDtp:', sdtp.length
+    );
   } catch(e) {
     console.error('O2C load error:', e);
-    document.getElementById('ldmsg').textContent = 'Error loading O2C data: ' + e.message;
+    // Show error visibly on the panel instead of just in loader text
+    const errHtml = '<div style="padding:32px;color:#dc2626;font-size:13px">'
+      + '<strong>Error loading O2C data:</strong> ' + e.message
+      + '<br><br>Check browser console for details.</div>';
+    const panels = ['panel-o2c','panel-coll-forecast'];
+    panels.forEach(id => {
+      const p = document.getElementById(id);
+      if (p) p.insertAdjacentHTML('afterbegin', errHtml);
+    });
   }
   document.getElementById('loader').style.display = 'none';
 }
@@ -2317,7 +2335,9 @@ function buildSiteForecastRows(scenario, siteFilter) {
     if (siteFilter !== 'all' && r.location !== siteFilter) return;
     const sd = getSiteDtp(r.location);
     const dtp = scenarioDtp(sd.avg, sd.std, scenario);
-    const invoiceDate  = r.month + '-15'; // mid-month estimate
+    // month may be '2025-10' or '2025-10-01' depending on Postgres cast — normalize to YYYY-MM
+    const monthKey    = (r.month||'').slice(0, 7);
+    const invoiceDate = monthKey + '-15'; // mid-month estimate
     const expectedDate = addDays(invoiceDate, dtp);
     rows.push({
       label:    r.location + ' (' + mLbl(r.month) + ' invoices)',
@@ -2462,7 +2482,8 @@ function renderForecastTable() {
       const dtpC = scenarioDtp(avg, std, 'conservative');
 
       // Use most recent open month as invoice date reference
-      const refMonth   = siteOpen.length ? siteOpen[siteOpen.length-1].month : new Date().toISOString().slice(0,7);
+      const rawMonth   = siteOpen.length ? siteOpen[siteOpen.length-1].month : new Date().toISOString().slice(0,7);
+      const refMonth   = (rawMonth||'').slice(0,7); // normalize to YYYY-MM
       const refDate    = refMonth + '-15';
 
       allRows.push({
