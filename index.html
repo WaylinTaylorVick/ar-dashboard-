@@ -734,10 +734,10 @@ async function getAll(basePath, pageSize = 1000) {
 }
 
 async function post(path, body) {
-  return fetch(SB + '/rest/v1/' + path, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+  return fetch(SB + '/rest/v1/' + path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
 }
 async function patch(path, body) {
-  return fetch(SB + '/rest/v1/' + path, { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  return fetch(SB + '/rest/v1/' + path, { method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
 }
 async function del(path) {
   return fetch(SB + '/rest/v1/' + path, { method: 'DELETE', headers: authHeaders() });
