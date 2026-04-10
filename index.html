@@ -708,7 +708,9 @@ function authHeaders() {
 }
 
 async function get(path) {
-  const r = await fetch(SB + '/rest/v1/' + path, { headers: authHeaders() });
+  const r = await fetch(SB + '/rest/v1/' + path, {
+    headers: { ...authHeaders(), 'Range': '0-4999' }
+  });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
@@ -2090,7 +2092,7 @@ async function loadO2CData() {
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      get('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
+      get('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc&limit=5000'),
     ]);
     O2C.revenue   = rev;
     O2C.bookings  = book;
