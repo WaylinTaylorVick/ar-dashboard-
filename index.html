@@ -758,6 +758,7 @@ const bBadge = b => {
   const cls = b === 'Current' ? 'bc' : b === '1-30' ? 'b1' : b === '31-60' ? 'b2' : b === '61-90' ? 'b3' : 'b4';
   return `<span class="bdg ${cls}">${b}</span>`;
 };
+const bucketBadge = bBadge; // alias used in WoW / near-boundary sections
 const sBadge = (sc, tier) => {
   const cls = tier === 'Critical' ? 'sc' : tier === 'High' ? 'sh' : tier === 'Medium' ? 'sm' : 'sw';
   return `<span class="sbdg ${cls}">${sc}</span>`;
@@ -2086,7 +2087,7 @@ async function loadO2CData() {
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      get('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,dtp_optimistic,dtp_base,dtp_conservative,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
+      get('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
     ]);
     O2C.revenue   = rev;
     O2C.bookings  = book;
@@ -2166,6 +2167,7 @@ async function renderO2C() {
 }
 
 function renderO2CBookings() {
+  if (!O2C.bookings || !O2C.revenue) return; // data not loaded yet
   const entity = document.getElementById('o2c-bk-entity').value;
   const bk = O2C.bookings.filter(r=>r.location===entity).sort((a,b)=>a.month>b.month?1:-1);
   const sh = O2C.revenue.filter(r=>r.location===entity).sort((a,b)=>a.month>b.month?1:-1);
@@ -2190,6 +2192,7 @@ function renderO2CBookings() {
 }
 
 function renderO2CBillingsColl() {
+  if (!O2C.ar) return;
   const arData = (O2C.ar||[])
     .map(r=>({...r, month:(r.month||'').slice(0,7)}))
     .filter(r=>r.location!=='Wilkes-Barre');
