@@ -629,6 +629,8 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         <option value="26">26 weeks</option>
       </select>
     </div>
+    <button onclick="exportForecastCSV()" style="padding:6px 16px;background:var(--green);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-left:8px">&#8681; Export CSV</button>
+    <button onclick="exportForecastExcel()" style="padding:6px 16px;background:#1a7a4a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">&#8681; Export Excel</button>
   </div>
   <div class="krow" id="fc-kpis"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
@@ -709,7 +711,7 @@ function authHeaders() {
 
 async function get(path) {
   const r = await fetch(SB + '/rest/v1/' + path, {
-    headers: { ...authHeaders(), 'Range': '0-4999' }
+    headers: { ...authHeaders(), 'Range': '0-19999' }
   });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
@@ -858,11 +860,11 @@ async function loadAll() {
     // Load most recent 2 weeks of movements by default; full data loaded on tab open
     const latestWowWeek = D.trend.length ? D.trend[D.trend.length-1].week : '';
     if (latestWowWeek) {
-      D.wow = await get(`v_wow_movements?week=eq.${latestWowWeek}&select=*&order=curr_balance.desc`);
+      D.wow = await get(`v_wow_movements?week=eq.${latestWowWeek}&select=*&order=curr_balance.desc&limit=5000`);
     }
 
     ld('Loading invoice detail…');
-    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,consolidated_salesperson&order=days_past_due.desc&limit=5000');
+    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,consolidated_salesperson&order=days_past_due.desc&limit=10000');
 
     ld('Loading notes…');
     D_notes = await get('ar_notes?select=*&order=created_at.desc');
@@ -1487,7 +1489,7 @@ function renderWow() {
 async function loadWowWeek(week) {
   if (!week) return;
   try {
-    D.wow = await get(`v_wow_movements?week=eq.${week}&select=*&order=curr_balance.desc`);
+    D.wow = await get(`v_wow_movements?week=eq.${week}&select=*&order=curr_balance.desc&limit=5000`);
   } catch(e) { D.wow = []; }
   filterWow();
 }
@@ -1565,10 +1567,10 @@ function billPeriodDates(period) {
 
 async function loadBillings() {
   if (!D_billings.length) {
-    D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc');
+    D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc&limit=20000');
   }
   if (!D_collections_m.length) {
-    D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc');
+    D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc&limit=20000');
   }
 }
 
@@ -1943,8 +1945,8 @@ function switchTab(name) {
   // Lazy-load on first visit
   if (name === 'billings')             renderBillings();
   if (name === 'collections-analysis') renderCollectionsAnalysis();
-  if (name === 'o2c')                  renderO2C();
-  if (name === 'coll-forecast')        renderForecast();
+  if (name === 'o2c')                  { o2cLoaded = false; renderO2C(); }
+  if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); }
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
@@ -2078,8 +2080,9 @@ let o2cRendered  = false;
 let fcTblLimit   = 50;
 let fcTblCache   = [];
 
-async function loadO2CData() {
-  if (o2cLoaded) return;
+async function loadO2CData(forceReload = false) {
+  if (o2cLoaded && !forceReload) return;
+  o2cLoaded = false; // prevent concurrent loads
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('ldmsg').textContent = 'Loading O2C data…';
   try {
@@ -2643,6 +2646,136 @@ async function refreshAll() {
   await _origRefreshAll();
 }
 
+
+
+// ═══════════════════════════════════════════════════════
+// COLLECTIONS FORECAST EXPORT
+// Exports weekly by site — formatted for 13-week CF model
+// ═══════════════════════════════════════════════════════
+
+function buildForecastExportData() {
+  const scenario = document.getElementById('fc-scenario').value;
+  const site     = document.getElementById('fc-site').value;
+  const weeksOut = parseInt(document.getElementById('fc-weeks').value);
+  const weeks    = buildForecastWeeks(weeksOut);
+  const { currentByWeek, overdueByWeek } = buildForecastLayers(scenario, site, weeks);
+  const siteLocs = site === 'all' ? ['Brookville', 'Kilgore', 'Wilkes-Barre'] : [site];
+
+  // Build rows: one row per week, columns per site + total
+  const rows = weeks.map(w => {
+    const d = new Date(w + 'T00:00:00');
+    const wkLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const row = { 'Week Of': wkLabel };
+    let total = 0;
+    siteLocs.forEach(loc => {
+      const current  = currentByWeek[w]?.[loc]  || 0;
+      const overdue  = overdueByWeek[w]?.[loc]  || 0;
+      const combined = current + overdue;
+      row[loc + ' - Current']  = Math.round(current);
+      row[loc + ' - Overdue']  = Math.round(overdue);
+      row[loc + ' - Total']    = Math.round(combined);
+      total += combined;
+    });
+    row['Grand Total'] = Math.round(total);
+    return row;
+  });
+
+  // Add totals row
+  const totals = { 'Week Of': 'TOTAL' };
+  const cols = Object.keys(rows[0]).filter(k => k !== 'Week Of');
+  cols.forEach(c => {
+    totals[c] = rows.reduce((s, r) => s + (+r[c] || 0), 0);
+  });
+  rows.push(totals);
+
+  // Add metadata rows at top
+  const scenarioLabel = scenario.charAt(0).toUpperCase() + scenario.slice(1);
+  const siteLabel     = site === 'all' ? 'All Sites' : site;
+  const meta = [
+    { 'Week Of': 'Collections Forecast Export' },
+    { 'Week Of': 'Scenario: ' + scenarioLabel },
+    { 'Week Of': 'Site: '     + siteLabel },
+    { 'Week Of': 'Generated: ' + new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) },
+    { 'Week Of': '' },
+  ];
+
+  return { rows, meta, cols: ['Week Of', ...cols] };
+}
+
+function exportForecastCSV() {
+  const { rows, meta, cols } = buildForecastExportData();
+  const allRows = [...meta, ...rows];
+  const lines   = [];
+
+  // Header
+  lines.push(cols.map(c => '"' + c + '"').join(','));
+
+  // Data
+  allRows.forEach(r => {
+    lines.push(cols.map(c => {
+      const v = r[c] ?? '';
+      return typeof v === 'number' ? v : '"' + String(v).replace(/"/g, '""') + '"';
+    }).join(','));
+  });
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const scenario = document.getElementById('fc-scenario').value;
+  const site     = document.getElementById('fc-site').value;
+  a.href     = url;
+  a.download = 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportForecastExcel() {
+  // Build HTML table that Excel opens natively — no library needed
+  const { rows, meta, cols } = buildForecastExportData();
+  const scenario = document.getElementById('fc-scenario').value;
+  const site     = document.getElementById('fc-site').value;
+
+  let table = '<table border="1"><thead><tr>';
+  cols.forEach(c => {
+    table += '<th style="background:#1f4e79;color:white;padding:6px 10px;font-weight:bold">' + c + '</th>';
+  });
+  table += '</tr></thead><tbody>';
+
+  // Metadata rows
+  meta.forEach(r => {
+    table += '<tr><td colspan="' + cols.length + '" style="color:#666;font-style:italic;padding:3px 8px">'
+      + (r['Week Of'] || '') + '</td></tr>';
+  });
+
+  // Data rows
+  rows.forEach((r, i) => {
+    const isTotals = r['Week Of'] === 'TOTAL';
+    const bg = isTotals ? 'background:#1f4e79;color:white;font-weight:bold'
+             : i % 2 === 0 ? 'background:#f7f9fc' : '';
+    table += '<tr>';
+    cols.forEach(c => {
+      const v   = r[c] ?? '';
+      const num = typeof v === 'number';
+      const fmt = num && v !== 0 ? '$' + v.toLocaleString('en-US') : (v === 0 && num ? '—' : v);
+      table += '<td style="padding:5px 10px;text-align:' + (num ? 'right' : 'left') + ';' + bg + '">' + fmt + '</td>';
+    });
+    table += '</tr>';
+  });
+  table += '</tbody></table>';
+
+  const html_content = '<html xmlns:o="urn:schemas-microsoft-com:office:office" '
+    + 'xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">'
+    + '<head><meta charset="utf-8"><style>td,th{font-family:Calibri,Arial,sans-serif;font-size:11pt}</style></head>'
+    + '<body>' + table + '</body></html>';
+
+  const blob = new Blob([html_content], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.xls';
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 </script>
 </body>
