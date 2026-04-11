@@ -998,7 +998,7 @@ let D_aging_change = [];
 
 async function loadAgingChange() {
   if (!D_aging_change.length) {
-    D_aging_change = await getAll('v_aging_change_l6m?select=*&order=ar_rank.asc');
+    D_aging_change = await getAll('v_aging_change_l6m?select=*&order=rank_by_ar.asc');
   }
 }
 
