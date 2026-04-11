@@ -18,6 +18,12 @@
   --green:#16a34a; --red:#dc2626; --amber:#d97706; --blue:#4a5568;
   --c0:#6b7280; --c1:#d4a24e; --c2:#c4712e; --c3:#a83232; --c4:#8b2332;
 }
+[data-theme="dark"] {
+  --bg:#0f1117; --bg2:#1a1d27; --bg3:#252836; --border:#2e3347;
+  --text:#e2e8f0; --text2:#8892a4; --accent:#b84458;
+  --green:#22c55e; --red:#f87171; --amber:#fbbf24; --blue:#6b7280;
+  --c0:#6b7280; --c1:#d4a24e; --c2:#c4712e; --c3:#a83232; --c4:#b84458;
+}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}
 .hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
@@ -103,6 +109,18 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 .nbtn:hover{background:var(--bg3)}
 .rbtn{padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600}
 .rbtn:hover{background:#6d1a2a}
+[data-theme="dark"] .hdr{box-shadow:0 1px 0 var(--border)}
+[data-theme="dark"] .sec{box-shadow:0 1px 3px rgba(0,0,0,.4)}
+[data-theme="dark"] table thead tr{background:var(--bg3)}
+[data-theme="dark"] table tbody tr:nth-child(even){background:rgba(255,255,255,.03)}
+[data-theme="dark"] table tbody tr:hover{background:rgba(255,255,255,.06)}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{
+  background:var(--bg3);color:var(--text);border-color:var(--border)}
+[data-theme="dark"] .kpi{background:var(--bg3)}
+[data-theme="dark"] .tab.active{background:var(--bg2);border-bottom-color:var(--bg2)}
+[data-theme="dark"] .tab:hover{background:var(--bg3)}
+[data-theme="dark"] .bdg{opacity:.9}
+[data-theme="dark"] canvas{filter:brightness(.95)}
 @media print{
   .tabs,.hdr button,.signout-btn,.live-ind,#asof,.frow,.shdr button{display:none!important}
   .panel{display:block!important}
@@ -190,6 +208,8 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <div style="display:flex;align-items:center;gap:14px;color:var(--text2);font-size:12px">
     <span class="live"><span class="ldot"></span> Live</span>
     <span id="asof">Loading…</span>
+    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"
+      style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:15px;line-height:1;color:var(--text2)">🌙</button>
     <span id="userBadge" class="user-badge" style="display:none"><span id="userEmail"></span><button class="signout-btn" onclick="signOut()">Sign out</button></span>
     <button class="rbtn" onclick="refreshAll()">&#8635; Refresh</button>
     <button class="rbtn" style="background:var(--bg2);color:var(--accent);border:1px solid var(--accent)" onclick="sendEmail()">&#128231; Send Digest</button>
@@ -1097,6 +1117,39 @@ async function renderBillingsDailyMTD() {
     }
   });
 }
+
+
+// ── Dark mode ─────────────────────────────────────────────────────
+function applyTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = dark ? '☀️' : '🌙';
+
+  // Update Chart.js global defaults to match theme
+  const textColor  = dark ? '#8892a4' : '#6b7280';
+  const gridColor  = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  if (window.Chart) {
+    Chart.defaults.color = textColor;
+    Chart.defaults.borderColor = gridColor;
+  }
+
+  // Re-render all active charts so colors update immediately
+  Object.values(charts).forEach(c => { if (c && typeof c.update === 'function') c.update(); });
+}
+
+function toggleTheme() {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  const newDark = !isDark;
+  localStorage.setItem('apex_theme', newDark ? 'dark' : 'light');
+  applyTheme(newDark);
+}
+
+// Apply saved theme on load
+(function() {
+  const saved = localStorage.getItem('apex_theme');
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  applyTheme(saved === 'dark' || (!saved && prefersDark));
+})();
 
 async function loadAll() {
   document.getElementById('loader').style.display = 'flex';
