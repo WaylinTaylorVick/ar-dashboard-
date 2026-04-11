@@ -3,14 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>Apex Geotech AR Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 :root {
   --bg:#f5f5f5; --bg2:#ffffff; --bg3:#ebedf0; --border:#d1d5db;
@@ -18,21 +14,15 @@
   --green:#16a34a; --red:#dc2626; --amber:#d97706; --blue:#4a5568;
   --c0:#6b7280; --c1:#d4a24e; --c2:#c4712e; --c3:#a83232; --c4:#8b2332;
 }
-[data-theme="dark"] {
-  --bg:#0f1117; --bg2:#1a1d27; --bg3:#252836; --border:#2e3347;
-  --text:#e2e8f0; --text2:#8892a4; --accent:#b84458;
-  --green:#22c55e; --red:#f87171; --amber:#fbbf24; --blue:#6b7280;
-  --c0:#6b7280; --c1:#d4a24e; --c2:#c4712e; --c3:#a83232; --c4:#b84458;
-}
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px}
 .hdr{background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
 .hdr h1{font-size:20px;font-weight:600}
-.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;overflow-x:auto;align-items:center;scrollbar-width:none;-ms-overflow-style:none}.tabs::-webkit-scrollbar{display:none}
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;overflow-x:auto;align-items:center}
 .tab{padding:12px 20px;cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap;transition:all .15s}
 .tab:hover{color:var(--text);background:var(--bg3)}
 .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
-.tgl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);opacity:.6;padding:0 8px 0 4px;font-weight:700;white-space:nowrap}
+.tgl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:var(--text2);opacity:.6;padding:0 8px 0 4px;font-weight:700;white-space:nowrap}
 .tdiv{width:1px;height:24px;background:var(--border);margin:0 8px;flex-shrink:0}
 .content{padding:20px 24px;max-width:1600px;margin:0 auto}
 .panel{display:none}
@@ -109,26 +99,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 .nbtn:hover{background:var(--bg3)}
 .rbtn{padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600}
 .rbtn:hover{background:#6d1a2a}
-[data-theme="dark"] .hdr{box-shadow:0 1px 0 var(--border)}
-[data-theme="dark"] .sec{box-shadow:0 1px 3px rgba(0,0,0,.4)}
-[data-theme="dark"] table thead tr{background:var(--bg3)}
-[data-theme="dark"] table tbody tr:nth-child(even){background:rgba(255,255,255,.03)}
-[data-theme="dark"] table tbody tr:hover{background:rgba(255,255,255,.06)}
-[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{
-  background:var(--bg3);color:var(--text);border-color:var(--border)}
-[data-theme="dark"] .kpi{background:var(--bg3)}
-[data-theme="dark"] .tab.active{background:var(--bg2);border-bottom-color:var(--bg2)}
-[data-theme="dark"] .tab:hover{background:var(--bg3)}
-[data-theme="dark"] .bdg{opacity:.9}
-[data-theme="dark"] canvas{filter:brightness(.95)}
-@media print{
-  .tabs,.hdr button,.signout-btn,.live-ind,#asof,.frow,.shdr button{display:none!important}
-  .panel{display:block!important}
-  #panel-exec{display:block!important}
-  .sec{break-inside:avoid;box-shadow:none;border:1px solid #ddd}
-  body{background:#fff}
-  .kpi{min-width:120px}
-}
 @media(max-width:900px){.krow{grid-template-columns:repeat(2,1fr)}.content{padding:12px}.blbl{width:120px}}
 
 .login-overlay{position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center}
@@ -208,8 +178,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <div style="display:flex;align-items:center;gap:14px;color:var(--text2);font-size:12px">
     <span class="live"><span class="ldot"></span> Live</span>
     <span id="asof">Loading…</span>
-    <button id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode"
-      style="background:none;border:1px solid var(--border);border-radius:6px;padding:5px 10px;cursor:pointer;font-size:15px;line-height:1;color:var(--text2)">🌙</button>
     <span id="userBadge" class="user-badge" style="display:none"><span id="userEmail"></span><button class="signout-btn" onclick="signOut()">Sign out</button></span>
     <button class="rbtn" onclick="refreshAll()">&#8635; Refresh</button>
     <button class="rbtn" style="background:var(--bg2);color:var(--accent);border:1px solid var(--accent)" onclick="sendEmail()">&#128231; Send Digest</button>
@@ -224,7 +192,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <span class="tgl">AR Detail</span>
   <div class="tab active" data-tab="ov">Overview</div>
   <div class="tab" data-tab="coll">Collection Actions</div>
-  <div class="tab" data-tab="aging-change">Aging Change</div>
   <div class="tab" data-tab="cust">Customer Detail</div>
   <div class="tab" data-tab="sp">Salesperson</div>
   <div class="tab" data-tab="wow">&#128200; AR Movements</div>
@@ -268,10 +235,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 
 <!-- ══════════════ EXEC ══════════════ -->
 <div class="panel" id="panel-exec">
-  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-    <div class="mda" id="mda"></div>
-    <button onclick="window.print()" style="padding:5px 14px;font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;cursor:pointer;color:var(--text2)">⬜ Print / PDF</button>
-  </div>
+  <div class="mda" id="mda"></div>
   <div class="krow" id="exkpis"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="sec"><div class="shdr"><div class="stitle">Aging by Location</div></div><div style="padding:16px" id="exbars"></div></div>
@@ -332,58 +296,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         <th>Invoice #</th><th>Plant</th><th>Invoice Date</th><th>Due Date</th>
         <th class="amt">Balance</th><th class="amt">Days Past Due</th><th>Bucket</th>
       </tr></thead><tbody id="drillbody"></tbody></table>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════ AGING CHANGE ══════════════ -->
-<div class="panel" id="panel-aging-change">
-  <div class="krow" id="aging-chg-kpis"></div>
-  <div class="sec">
-    <div class="shdr" style="justify-content:space-between">
-      <div>
-        <div class="stitle">Aging Change — Last 6 Months</div>
-        <div class="ssub" id="agc-chart-sub">Top 30 customers ranked by Total AR · All others grouped</div>
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <div style="display:flex;gap:3px;align-items:center">
-          <span style="font-size:11px;color:var(--text2);margin-right:2px">Rank by:</span>
-          <button id="agc-rank-ar" onclick="setAgcRank('ar')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">T30 Total AR</button>
-          <button id="agc-rank-60" onclick="setAgcRank('60')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">T30 60+</button>
-          <button id="agc-rank-90" onclick="setAgcRank('90')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">T30 90+</button>
-        </div>
-        <div style="display:flex;gap:3px">
-          <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Show 60+</button>
-          <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Show 90+</button>
-        </div>
-      </div>
-    </div>
-    <div id="agc-chart-60" style="position:relative;height:400px;padding:16px"><canvas id="agcChart60"></canvas></div>
-    <div id="agc-chart-90" style="position:relative;height:400px;padding:16px;display:none"><canvas id="agcChart90"></canvas></div>
-  </div>
-  <div class="sec" style="margin-top:16px">
-    <div class="shdr"><div class="stitle">Detail Table</div></div>
-    <div style="overflow-x:auto">
-      <table>
-        <thead>
-            <tr>
-              <th rowspan="2" onclick="agcSortBy('customer')"    style="cursor:pointer;vertical-align:bottom">Customer</th>
-              <th rowspan="2" onclick="agcSortBy('location')"    style="cursor:pointer;vertical-align:bottom;font-size:12px">Site</th>
-              <th rowspan="2" onclick="agcSortBy('salesperson')" style="cursor:pointer;vertical-align:bottom;font-size:12px">Salesperson</th>
-              <th rowspan="2" onclick="agcSortBy('total_ar')"    class="amt" style="cursor:pointer;vertical-align:bottom">Total AR</th>
-              <th rowspan="2" id="agc-th-now"                    class="amt" style="cursor:pointer;vertical-align:bottom;font-weight:700">Now ↓</th>
-              <th colspan="5" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
-            </tr>
-            <tr id="agc-month-headers">
-              <th class="amt" id="agc-th-chg0" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
-              <th class="amt" id="agc-th-chg1" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
-              <th class="amt" id="agc-th-chg2" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
-              <th class="amt" id="agc-th-chg3" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
-              <th class="amt" id="agc-th-chg4" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
-            </tr>
-          </thead>
-        <tbody id="agc-table-body"></tbody>
-      </table>
     </div>
   </div>
 </div>
@@ -479,12 +391,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   </div>
   <div class="krow" id="bill-kpis"></div>
   <div class="frow">
-    <div class="fg"><label>Granularity:</label>
-      <select id="bill-gran" onchange="renderBillings()">
-        <option value="monthly" selected>Monthly</option>
-        <option value="weekly">Weekly</option>
-      </select>
-    </div>
     <div class="fg"><label>Period:</label>
       <select id="bill-period">
         <option value="MTD">Month to Date</option>
@@ -515,10 +421,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-    <div class="sec" id="bill-daily-sec" style="margin-bottom:20px">
-      <div class="shdr"><div class="stitle">Daily Billings — MTD</div><div class="ssub" id="bill-daily-sub"></div></div>
-      <div style="position:relative;height:260px;padding:16px"><canvas id="billDailyChart"></canvas></div>
-    </div>
     <div class="sec">
       <div class="shdr"><div class="stitle">Top Customers by Billings</div></div>
       <div style="overflow-x:auto"><table><thead><tr>
@@ -538,12 +440,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 <div class="panel" id="panel-collections-analysis">
   <div class="krow" id="coll-an-kpis"></div>
   <div class="frow">
-    <div class="fg"><label>Granularity:</label>
-      <select id="ca-gran" onchange="renderCollectionsAnalysis()">
-        <option value="monthly" selected>Monthly</option>
-        <option value="weekly">Weekly</option>
-      </select>
-    </div>
     <div class="fg"><label>Period:</label>
       <select id="ca-period">
         <option value="L3">Last 3 Months</option>
@@ -659,7 +555,10 @@ tr.trow:hover td{background:var(--accent);color:#fff}
       </div>
       <div style="position:relative;height:300px;padding:16px"><canvas id="o2cRevChart"></canvas></div>
     </div>
-
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Gross Margin % — BV &amp; KG</div><div class="ssub">WB cost data not available</div></div>
+      <div style="position:relative;height:300px;padding:16px"><canvas id="o2cMarginChart"></canvas></div>
+    </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
     <div class="sec">
@@ -677,19 +576,36 @@ tr.trow:hover td{background:var(--accent);color:#fff}
       <div style="position:relative;height:300px;padding:16px"><canvas id="o2cCollChart"></canvas></div>
     </div>
   </div>
-
+  <div class="sec" style="margin-bottom:20px">
+    <div class="shdr"><div class="stitle">AR Waterfall</div><div class="ssub">Billings → Collections → Net movement by period</div></div>
+    <div style="display:flex;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center">
+      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">From</label><input type="date" id="wf-from" value="2025-01-01" style="font-size:12px"></div>
+      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">To</label><input type="date" id="wf-to" value="2026-04-30" style="font-size:12px"></div>
+      <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Entity</label>
+        <select id="wf-entity" style="font-size:12px">
+          <option value="all">All Entities</option>
+          <option value="Brookville">Brookville</option>
+          <option value="Kilgore">Kilgore</option>
+          <option value="Wilkes-Barre">Wilkes-Barre</option>
+        </select>
+      </div>
+      <button onclick="renderWaterfall()" style="padding:5px 14px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Apply</button>
+    </div>
+    <div class="krow" id="wf-kpis" style="padding:16px 16px 0"></div>
+    <div style="position:relative;height:300px;padding:16px"><canvas id="wfChart"></canvas></div>
+  </div>
 </div>
 
 <!-- ══════════════ COLLECTIONS FORECAST ══════════════ -->
 <div class="panel" id="panel-coll-forecast">
-
   <div style="background:rgba(139,35,50,.04);border:1px solid rgba(139,35,50,.15);border-left:4px solid var(--accent);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:12px;line-height:1.6;color:var(--text2)">
-    <strong style="color:var(--text)">Methodology — Two-layer model:</strong>
-    &nbsp;<strong>Current invoices</strong> (not yet overdue): Expected date = MAX(due_date, invoice_date + customer avg DTP). Each invoice lands in a specific forecast week.
-    &nbsp;<strong>Overdue invoices</strong>: Distributed across near-term weeks using a decay curve — heavier weight in early weeks, tapering off. Conservative scenario applies a 15% haircut for potential uncollectables.
-    &nbsp;Customers with <strong>3+ paid invoices</strong> use their own DTP. Others fall back to site avg (BV: 56d · KG: 52d · WB: 68d).
-    &nbsp;Scenarios: <strong>Optimistic</strong> = avg &minus; 0.5&sigma; &nbsp;|&nbsp; <strong>Base</strong> = avg &nbsp;|&nbsp; <strong>Conservative</strong> = avg + 0.5&sigma; &minus; 15% haircut on overdue.
-    &nbsp;Solid bars = current invoices &nbsp;|&nbsp; Faded bars = overdue recovery. Base dates in <span style="color:var(--red);font-weight:600">red</span> in the table are past due.
+    <strong style="color:var(--text)">Methodology:</strong>
+    Expected collection date = Invoice Date + Customer Avg Days to Pay.
+    Customers with <strong>3+ invoices</strong> use their own DTP average &amp; std dev.
+    All others fall back to the site average (BV: 56d · KG: 52d · WB: 68d).
+    Scenarios: <strong>Optimistic</strong> = avg &minus; 0.5&sigma; &nbsp;|&nbsp;
+    <strong>Base</strong> = avg &nbsp;|&nbsp;
+    <strong>Conservative</strong> = avg + 0.5&sigma;
   </div>
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Site</label>
@@ -714,24 +630,22 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         <option value="26">26 weeks</option>
       </select>
     </div>
-    <button onclick="exportForecastCSV()" style="padding:6px 16px;background:var(--green);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;margin-left:8px">&#8681; Export CSV</button>
-    <button onclick="exportForecastExcel()" style="padding:6px 16px;background:#1a7a4a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">&#8681; Export Excel</button>
   </div>
   <div class="krow" id="fc-kpis"></div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
-    <div class="sec" style="margin-bottom:20px">
-      <div class="shdr" style="justify-content:space-between">
-        <div><div class="stitle">Collections Forecast</div><div class="ssub" id="fc-chart-sub">Expected cash in by week</div></div>
-        <div style="display:flex;gap:4px">
-          <button id="fc-view-weekly" onclick="setFcView('weekly')" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Weekly</button>
-          <button id="fc-view-cumul"  onclick="setFcView('cumul')"  style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Cumulative</button>
-          <button id="fc-view-site"   onclick="setFcView('site')"   style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">By Site</button>
-        </div>
-      </div>
-      <div id="fc-chart-weekly" style="position:relative;height:320px;padding:16px"><canvas id="fcWeekChart"></canvas></div>
-      <div id="fc-chart-cumul"  style="position:relative;height:320px;padding:16px;display:none"><canvas id="fcCumChart"></canvas></div>
-      <div id="fc-chart-site"   style="position:relative;height:320px;padding:16px;display:none"><canvas id="fcSiteChart"></canvas></div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Weekly Collections Forecast</div><div class="ssub" id="fc-chart-sub">Expected cash in by week</div></div>
+      <div style="position:relative;height:320px;padding:16px"><canvas id="fcWeekChart"></canvas></div>
     </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">Cumulative Collections</div><div class="ssub">Running total — all 3 scenarios</div></div>
+      <div style="position:relative;height:320px;padding:16px"><canvas id="fcCumChart"></canvas></div>
+    </div>
+  </div>
+  <div class="sec" style="margin-bottom:20px">
+    <div class="shdr"><div class="stitle">Collections Forecast by Site</div><div class="ssub">Weekly expected cash in — side by side</div></div>
+    <div style="position:relative;height:300px;padding:16px"><canvas id="fcSiteChart"></canvas></div>
+  </div>
   <div class="sec">
     <div class="shdr">
       <div><div class="stitle">Customer-Level Forecast Detail</div><div class="ssub" id="fc-tbl-sub">Open invoices ranked by expected collection date</div></div>
@@ -748,9 +662,8 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Customer / Invoice</th><th>Site</th>
-          <th class="amt">Balance</th>
-          <th class="amt">Inv. Date</th>
+          <th>Customer</th><th>Site</th>
+          <th class="amt">Open Balance</th>
           <th class="amt">Avg DTP</th>
           <th class="amt">&sigma;</th>
           <th class="amt">Source</th>
@@ -795,38 +708,15 @@ function authHeaders() {
 }
 
 async function get(path) {
-  const r = await fetch(SB + '/rest/v1/' + path, {
-    headers: { ...authHeaders(), 'Range': '0-19999' }
-  });
+  const r = await fetch(SB + '/rest/v1/' + path, { headers: authHeaders() });
   if (!r.ok) throw new Error(await r.text());
   return r.json();
 }
-
-// Paginated fetch — works around Supabase free tier 1000-row cap on views
-async function getAll(basePath, pageSize = 1000) {
-  let allRows = [];
-  let offset  = 0;
-  while (true) {
-    const sep  = basePath.includes('?') ? '&' : '?';
-    const path = basePath + sep + 'limit=' + pageSize + '&offset=' + offset;
-    const r    = await fetch(SB + '/rest/v1/' + path, {
-      headers: { ...authHeaders(), 'Prefer': 'count=exact' }
-    });
-    if (!r.ok) throw new Error(await r.text());
-    const rows = await r.json();
-    allRows = allRows.concat(rows);
-    if (rows.length < pageSize) break;
-    offset += pageSize;
-    if (offset > 20000) break;
-  }
-  return allRows;
-}
-
 async function post(path, body) {
-  return fetch(SB + '/rest/v1/' + path, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+  return fetch(SB + '/rest/v1/' + path, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
 }
 async function patch(path, body) {
-  return fetch(SB + '/rest/v1/' + path, { method: 'PATCH', headers: { ...authHeaders(), 'Content-Type': 'application/json', 'Prefer': 'return=representation' }, body: JSON.stringify(body) });
+  return fetch(SB + '/rest/v1/' + path, { method: 'PATCH', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 }
 async function del(path) {
   return fetch(SB + '/rest/v1/' + path, { method: 'DELETE', headers: authHeaders() });
@@ -871,7 +761,6 @@ const bBadge = b => {
   const cls = b === 'Current' ? 'bc' : b === '1-30' ? 'b1' : b === '31-60' ? 'b2' : b === '61-90' ? 'b3' : 'b4';
   return `<span class="bdg ${cls}">${b}</span>`;
 };
-const bucketBadge = bBadge; // alias used in WoW / near-boundary sections
 const sBadge = (sc, tier) => {
   const cls = tier === 'Critical' ? 'sc' : tier === 'High' ? 'sh' : tier === 'Medium' ? 'sm' : 'sw';
   return `<span class="sbdg ${cls}">${sc}</span>`;
@@ -946,349 +835,6 @@ async function refreshAll() {
   await loadAll();
 }
 
-
-
-// ── Forecast chart view toggle ─────────────────────────────────
-function setFcView(view) {
-  ['weekly','cumul','site'].forEach(v => {
-    document.getElementById('fc-chart-' + v).style.display = v === view ? '' : 'none';
-    const btn = document.getElementById('fc-view-' + v);
-    if (btn) {
-      btn.style.background = v === view ? 'var(--accent)' : 'var(--bg3)';
-      btn.style.color      = v === view ? '#fff' : 'var(--text)';
-    }
-  });
-  // Trigger chart resize after showing
-  const chartMap = {weekly: charts.fcWeek, cumul: charts.fcCum, site: charts.fcSite};
-  if (chartMap[view]) chartMap[view].resize();
-}
-
-// ── Empty state helper ─────────────────────────────────────────
-function showEmpty(elementId, message) {
-  const el = document.getElementById(elementId);
-  if (!el) return;
-  el.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;'
-    + 'height:140px;color:var(--text2);font-size:13px;gap:8px">'
-    + '<span style="font-size:28px;opacity:.35">◌</span>'
-    + '<span>' + (message || 'No data available') + '</span></div>';
-}
-function emptyCanvas(canvasId, message) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const wrapper = canvas.parentElement;
-  canvas.style.display = 'none';
-  const existing = wrapper.querySelector('.empty-state');
-  if (existing) existing.remove();
-  const div = document.createElement('div');
-  div.className = 'empty-state';
-  div.style.cssText = 'display:flex;flex-direction:column;align-items:center;justify-content:center;'
-    + 'height:200px;color:var(--text2);font-size:13px;gap:8px';
-  div.innerHTML = '<span style="font-size:28px;opacity:.35">◌</span>'
-    + '<span>' + (message || 'No data for this selection') + '</span>';
-  wrapper.appendChild(div);
-}
-function clearEmptyCanvas(canvasId) {
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  canvas.style.display = '';
-  const existing = canvas.parentElement?.querySelector('.empty-state');
-  if (existing) existing.remove();
-}
-
-
-// ══════════════════════════════════════════════════════════════════
-// AGING CHANGE — L6M
-// ══════════════════════════════════════════════════════════════════
-let D_aging_change = [];
-
-async function loadAgingChange() {
-  if (!D_aging_change.length) {
-    try {
-      D_aging_change = await getAll('v_aging_change_l6m?select=*&order=rank_by_ar.asc');
-      console.log('D_aging_change loaded:', D_aging_change.length, 'rows', D_aging_change[0]);
-    } catch(e) {
-      console.error('loadAgingChange error:', e);
-      const p = document.getElementById('panel-aging-change');
-      if (p) p.insertAdjacentHTML('afterbegin',
-        '<div style="padding:16px;color:var(--red);font-size:12px"><strong>Load error:</strong> ' + e.message + '</div>');
-    }
-  }
-}
-
-function setAgcView(view) {
-  ['60','90'].forEach(v => {
-    document.getElementById('agc-chart-' + v).style.display = v === view ? '' : 'none';
-    const btn = document.getElementById('agc-view-' + v);
-    if (btn) {
-      btn.style.background = v === view ? 'var(--accent)' : 'var(--bg3)';
-      btn.style.color      = v === view ? '#fff' : 'var(--text)';
-    }
-  });
-  if (charts['agcChart' + view]) charts['agcChart' + view].resize();
-  // Re-render table so change columns switch to match selected dimension
-  applyAgcRankAndRender();
-}
-
-function setAgcRank(mode) {
-  agcRankMode = mode;
-  // Update button styles
-  ['ar','60','90'].forEach(m => {
-    const btn = document.getElementById('agc-rank-' + m);
-    if (btn) {
-      btn.style.background = m === mode ? 'var(--accent)' : 'var(--bg3)';
-      btn.style.color      = m === mode ? '#fff' : 'var(--text)';
-    }
-  });
-  // Auto-switch sort column to match rank dimension
-  if (mode === '60') { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
-  if (mode === '90') { agcSortCol = 'curr_over_90'; agcSortDir = -1; }
-  if (mode === 'ar')  { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
-  // Re-render with new grouping
-  applyAgcRankAndRender();
-}
-
-function applyAgcRankAndRender() {
-  console.log('applyAgcRankAndRender: D_aging_change.length =', D_aging_change.length, 'agcRankMode =', agcRankMode);
-  if (!D_aging_change.length) {
-    const kpiEl = document.getElementById('aging-chg-kpis');
-    if (kpiEl) kpiEl.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No data loaded — check console</div>';
-    return;
-  }
-  const rankField = agcRankMode === '60' ? 'rank_by_60'
-                  : agcRankMode === '90' ? 'rank_by_90'
-                  : 'rank_by_ar';
-
-  // Top 30 by selected rank dimension
-  const top30     = D_aging_change.filter(r => (+r[rankField]||999) <= 30);
-  const others    = D_aging_change.filter(r => (+r[rankField]||999) > 30);
-
-  // All Others aggregated
-  const sum = (arr, key) => arr.reduce((s, r) => s + (+r[key]||0), 0);
-
-  const MONTHLY_FIELDS = ['now_60','now_90','m1_60','m1_90','m2_60','m2_90',
-    'm3_60','m3_90','m4_60','m4_90','m5_60','m5_90',
-    'chg_m0_m1_60','chg_m1_m2_60','chg_m2_m3_60','chg_m3_m4_60','chg_m4_m5_60',
-    'chg_m0_m1_90','chg_m1_m2_90','chg_m2_m3_90','chg_m3_m4_90','chg_m4_m5_90',
-    'curr_over_60','curr_over_90','prior_over_60','prior_over_90',
-    'change_over_60','change_over_90','total_ar'];
-  const sample0 = top30[0] || D_aging_change[0] || {};
-  const aggRow = (label, loc, arr) => {
-    const r = { customer: label, location: loc, salesperson: null,
-                m1_label: sample0.m1_label, m2_label: sample0.m2_label,
-                m3_label: sample0.m3_label, m4_label: sample0.m4_label,
-                m5_label: sample0.m5_label };
-    MONTHLY_FIELDS.forEach(f => r[f] = sum(arr, f));
-    return r;
-  };
-  const othersRow = others.length ? aggRow('All Others', 'Multiple', others) : null;
-  const all = [...top30, ...(othersRow ? [othersRow] : [])];
-  const totalRow  = aggRow('TOTAL', 'All Sites', all);
-
-    // Update chart subtitle
-  const sub = document.getElementById('agc-chart-sub');
-  if (sub) {
-    const label = agcRankMode === '60' ? 'ranked by 60+ balance'
-                : agcRankMode === '90' ? 'ranked by 90+ balance'
-                : 'ranked by Total AR';
-    sub.textContent = 'Top 30 customers ' + label + ' · All others grouped';
-  }
-
-  agcRenderChart('agcChart60', top30, 'curr_over_60', 'change_over_60', '60+ Days');
-  agcRenderChart('agcChart90', top30, 'curr_over_90', 'change_over_90', '90+ Days');
-  renderAgcTable(top30, othersRow, totalRow);
-}
-
-async function renderAgingChange() {
-  await loadAgingChange();
-  if (!D_aging_change.length) {
-    showEmpty('aging-chg-kpis', 'No aging change data available');
-    return;
-  }
-  // On first render, set defaults and delegate to applyAgcRankAndRender
-  agcSortCol = agcSortCol || 'curr_over_60';
-  agcSortDir = agcSortDir !== undefined ? agcSortDir : -1;
-  applyAgcRankAndRender();
-}
-
-let agcRankMode = 'ar'; // 'ar' | '60' | '90'
-let agcSortCol  = 'curr_over_60';
-let agcSortDir  = -1;
-
-
-function agcRenderChart(canvasId, rows, currKey, chgKey, label) {
-  const sorted    = [...rows].sort((a,b) => (+b[currKey]||0) - (+a[currKey]||0)).slice(0, 20);
-  const labels    = sorted.map(r => r.customer.length > 28 ? r.customer.slice(0,26)+'…' : r.customer);
-  const currVals  = sorted.map(r => +r[currKey]||0);
-  const chgVals   = sorted.map(r => +r[chgKey]||0);
-  const chgColors = chgVals.map(v => v > 0 ? 'rgba(220,38,38,.7)' : 'rgba(22,163,74,.7)');
-  if (charts[canvasId]) charts[canvasId].destroy();
-  charts[canvasId] = new Chart(document.getElementById(canvasId), {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'Current ' + label, data: currVals, backgroundColor: 'rgba(139,35,50,.55)', borderRadius: 2 },
-      { label: 'Change vs 6mo',    data: chgVals,  backgroundColor: chgColors, borderRadius: 2 },
-    ]},
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position:'bottom', labels:{font:{size:11},boxWidth:12} }, datalabels:{display:false} },
-      scales: { x:{ticks:{callback:v=>fmtK(v),font:{size:11}}}, y:{ticks:{font:{size:11}}} }
-    }
-  });
-}
-
-
-
-function agcSortBy(col) {
-  if (agcSortCol === col) agcSortDir *= -1;
-  else { agcSortCol = col; agcSortDir = col === 'customer' ? 1 : -1; }
-  applyAgcRankAndRender();
-}
-
-function renderAgcTable(dataRows, othersRow, totalRow) {
-  // Determine which aging dimension to show based on the active view toggle
-  const dim = (document.getElementById('agc-view-90')?.style.background || '').includes('accent') ||
-              (document.getElementById('agc-view-90')?.style.background === 'var(--accent)') ? '90' : '60';
-
-  // Column keys for the chosen dimension
-  const nowKey  = 'now_' + dim;
-  const chgKeys = ['chg_m0_m1_'+dim, 'chg_m1_m2_'+dim, 'chg_m2_m3_'+dim, 'chg_m3_m4_'+dim, 'chg_m4_m5_'+dim];
-
-  // Update month headers — use labels from first data row
-  const sample = dataRows[0] || othersRow || {};
-  const mLabels = [sample.m1_label||'M-1', sample.m2_label||'M-2',
-                   sample.m3_label||'M-3', sample.m4_label||'M-4', sample.m5_label||'M-5'];
-  // Pair labels: "Apr→Mar", "Mar→Feb", etc.
-  const chgLabels = [
-    'vs ' + (sample.m1_label||'M-1'),
-    (sample.m1_label||'M-1') + '→' + (sample.m2_label||'M-2'),
-    (sample.m2_label||'M-2') + '→' + (sample.m3_label||'M-3'),
-    (sample.m3_label||'M-3') + '→' + (sample.m4_label||'M-4'),
-    (sample.m4_label||'M-4') + '→' + (sample.m5_label||'M-5'),
-  ];
-  chgLabels.forEach((lbl, i) => {
-    const th = document.getElementById('agc-th-chg' + i);
-    if (th) {
-      const base = lbl + (agcSortCol === chgKeys[i] ? (agcSortDir===-1?' ↓':' ↑') : '');
-      th.textContent = base;
-      th.style.opacity = agcSortCol === chgKeys[i] ? '1' : '0.7';
-      th.onclick = () => agcSortBy(chgKeys[i]);
-    }
-  });
-
-  // Update "Now" header
-  const nowHdr = document.getElementById('agc-th-now_60') || document.getElementById('agc-th-now_90');
-  if (nowHdr) {
-    nowHdr.textContent = dim === '90' ? 'Now 90+' : 'Now 60+';
-    nowHdr.id = 'agc-th-now_' + dim;
-    nowHdr.onclick = () => agcSortBy(nowKey);
-  }
-
-  // Sort
-  const sorted = [...dataRows].sort((a, b) => {
-    const av = ['customer','location','salesperson'].includes(agcSortCol)
-      ? (a[agcSortCol]||'').localeCompare(b[agcSortCol]||'')
-      : (+a[agcSortCol]||0) - (+b[agcSortCol]||0);
-    return av * agcSortDir;
-  });
-
-  const chgColor = v => +v > 0 ? 'color:var(--red);font-weight:600' : +v < 0 ? 'color:var(--green);font-weight:600' : '';
-  const chgFmt   = v => v == null || +v === 0 ? '—' : (+v > 0 ? '+' : '') + fmtK(+v);
-
-  const rowHtml = (r, style) => {
-    const chgCells = chgKeys.map(k =>
-      `<td class="amt" style="font-size:11px;${chgColor(r[k])}">${chgFmt(r[k])}</td>`
-    ).join('');
-    return `<tr style="${style||''}">
-      <td><strong>${r.customer}</strong></td>
-      <td style="font-size:12px">${r.location||'—'}</td>
-      <td style="font-size:12px">${r.salesperson||'—'}</td>
-      <td class="amt">${fmtK(+r.total_ar)}</td>
-      <td class="amt" style="font-weight:600">${fmtK(+r[nowKey]||0)}</td>
-      ${chgCells}
-    </tr>`;
-  };
-
-  const rows = sorted.map(r => rowHtml(r, ''));
-  if (othersRow) rows.push(rowHtml(othersRow, 'background:var(--bg3);font-style:italic'));
-  if (totalRow)  rows.push(rowHtml(totalRow,  'background:var(--bg3);font-weight:700;border-top:2px solid var(--border)'));
-  document.getElementById('agc-table-body').innerHTML = rows.join('');
-}
-
-
-async function renderBillingsDailyMTD() {
-  if (!D_billings_daily.length) return;
-  const plant = document.getElementById('bill-plant')?.value || 'All';
-  const data  = D_billings_daily.filter(r => plant === 'All' || r.location === plant);
-  const days  = [...new Set(data.map(r=>r.invoice_date))].sort();
-
-  if (!days.length) {
-    emptyCanvas('billDailyChart', 'No daily billings data for MTD');
-    document.getElementById('bill-daily-sub').textContent = '';
-    return;
-  }
-  clearEmptyCanvas('billDailyChart');
-
-  const locs = ['Brookville','Kilgore','Wilkes-Barre'];
-  const mtdTotal = data.reduce((s,r)=>s+(+r.billed_amount||0),0);
-  document.getElementById('bill-daily-sub').textContent =
-    'MTD Total: ' + fmtK(mtdTotal) + ' · ' + days.length + ' billing days';
-
-  if (charts.billDaily) charts.billDaily.destroy();
-  charts.billDaily = new Chart(document.getElementById('billDailyChart'), {
-    type: 'bar',
-    data: {
-      labels: days.map(d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})),
-      datasets: locs.map(loc => ({
-        label: loc,
-        data: days.map(d => data.filter(r=>r.invoice_date===d&&r.location===loc).reduce((s,r)=>s+(+r.billed_amount||0),0)),
-        backgroundColor: LOC_COLORS[loc] || '#6b7280',
-        stack: 's', borderRadius: 2,
-      }))
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
-      scales: {
-        x: { stacked: true, ticks: { font: { size: 11 } } },
-        y: { stacked: true, ticks: { callback: v => fmtK(v) } }
-      }
-    }
-  });
-}
-
-
-// ── Dark mode ─────────────────────────────────────────────────────
-function applyTheme(dark) {
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  const btn = document.getElementById('theme-toggle');
-  if (btn) btn.textContent = dark ? '☀️' : '🌙';
-
-  // Update Chart.js global defaults to match theme
-  const textColor  = dark ? '#8892a4' : '#6b7280';
-  const gridColor  = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  if (window.Chart) {
-    Chart.defaults.color = textColor;
-    Chart.defaults.borderColor = gridColor;
-  }
-
-  // Re-render all active charts so colors update immediately
-  Object.values(charts).forEach(c => { if (c && typeof c.update === 'function') c.update(); });
-}
-
-function toggleTheme() {
-  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  const newDark = !isDark;
-  localStorage.setItem('apex_theme', newDark ? 'dark' : 'light');
-  applyTheme(newDark);
-}
-
-// Apply saved theme on load
-(function() {
-  const saved = localStorage.getItem('apex_theme');
-  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  applyTheme(saved === 'dark' || (!saved && prefersDark));
-})();
-
 async function loadAll() {
   document.getElementById('loader').style.display = 'flex';
   try {
@@ -1309,11 +855,11 @@ async function loadAll() {
     // Load most recent 2 weeks of movements by default; full data loaded on tab open
     const latestWowWeek = D.trend.length ? D.trend[D.trend.length-1].week : '';
     if (latestWowWeek) {
-      D.wow = await get(`v_wow_movements?week=eq.${latestWowWeek}&select=*&order=curr_balance.desc&limit=5000`);
+      D.wow = await get(`v_wow_movements?week=eq.${latestWowWeek}&select=*&order=curr_balance.desc`);
     }
 
     ld('Loading invoice detail…');
-    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,consolidated_salesperson&order=days_past_due.desc&limit=10000');
+    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,consolidated_salesperson&order=days_past_due.desc&limit=5000');
 
     ld('Loading notes…');
     D_notes = await get('ar_notes?select=*&order=created_at.desc');
@@ -1327,25 +873,7 @@ async function loadAll() {
     scored = D.custs.filter(c => +c.total_ar > 0).map(c => ({ ...c, ...score(c, totalAR) })).sort((a, b) => b.s - a.s);
 
     const rd = D.sum[0]?.refreshed_at;
-    if (rd) {
-      const asofDate = new Date(rd);
-      const ageHrs   = (Date.now() - asofDate.getTime()) / 3600000;
-      document.getElementById('asof').textContent = 'As of '
-        + asofDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-      const dot   = document.getElementById('ldot');
-      const lbl   = document.getElementById('live-label');
-      if (dot && lbl) {
-        if (ageHrs > 24) {
-          dot.style.background = 'var(--red)'; dot.style.boxShadow = '0 0 0 2px rgba(220,38,38,.3)';
-          lbl.textContent = 'Stale'; lbl.style.color = 'var(--red)';
-        } else if (ageHrs > 4) {
-          dot.style.background = 'var(--amber)'; dot.style.boxShadow = '0 0 0 2px rgba(217,119,6,.3)';
-          lbl.textContent = 'Aging'; lbl.style.color = 'var(--amber)';
-        }
-      }
-    } else {
-      document.getElementById('asof').textContent = 'Live';
-    }
+    document.getElementById('asof').textContent = rd ? 'As of ' + new Date(rd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Live';
 
     hideLoader();
     renderAll();
@@ -1400,28 +928,11 @@ function renderOV() {
   const NI = s.reduce((a, r) => a + (+r.num_invoices || 0), 0);
   const NC = s.reduce((a, r) => a + (+r.num_customers || 0), 0);
 
-  // WoW delta from v_weekly_trend
-  const trendSorted = [...(D.trend||[])].sort((a,b) => a.week > b.week ? 1 : -1);
-  const wkCurr  = trendSorted[trendSorted.length - 1];
-  const wkPrev  = trendSorted[trendSorted.length - 2];
-  const wowT    = wkCurr && wkPrev ? +wkCurr.total - +wkPrev.total : null;
-  const wowPD   = wkCurr && wkPrev
-    ? ((+wkCurr['1-30']||0)+(+wkCurr['31-60']||0)+(+wkCurr['61-90']||0)+(+wkCurr['90+']||0))
-    - ((+wkPrev['1-30']||0)+(+wkPrev['31-60']||0)+(+wkPrev['61-90']||0)+(+wkPrev['90+']||0))
-    : null;
-  const wowB4   = wkCurr && wkPrev ? (+wkCurr['90+']||0) - (+wkPrev['90+']||0) : null;
-  const wowBadge = (val, badIsUp) => {
-    if (val === null || val === 0) return '';
-    const isUp  = val > 0;
-    const isBad = badIsUp ? isUp : !isUp;
-    const color = isBad ? 'var(--red)' : 'var(--green)';
-    return ' <span style="font-size:11px;font-weight:600;color:'+color+'">'+(isUp?'↑':'↓')+' '+fmtK(Math.abs(val))+' WoW</span>';
-  };
   document.getElementById('ovkpis').innerHTML = [
-    { l: 'Total Open AR', v: fmtK(T), s: NI + ' invoices · ' + NC + ' customers' + wowBadge(wowT, false), c: 'n' },
-    { l: 'Past Due', v: fmtK(PD), s: pct(PD,T) + ' of AR' + wowBadge(wowPD, true), c: PD/T > 0.4 ? 'r' : 'n' },
-    { l: '60+ Days', v: fmtK(SP), s: pct(SP,T) + ' of AR', c: SP/T > 0.12 ? 'r' : 'n' },
-    { l: '90+ Days', v: fmtK(B4), s: pct(B4,T) + ' of AR' + wowBadge(wowB4, true), c: B4 > 0 ? 'r' : 'n' },
+    { l: 'Total Open AR', v: fmtK(T), s: NI + ' invoices, ' + NC + ' customers', c: 'n' },
+    { l: 'Past Due', v: fmtK(PD), s: pct(PD, T) + ' of AR', c: PD / T > 0.4 ? 'r' : 'n' },
+    { l: '60+ Days', v: fmtK(SP), s: pct(SP, T) + ' of AR', c: SP / T > 0.12 ? 'r' : 'n' },
+    { l: '90+ Days', v: fmtK(B4), s: pct(B4, T) + ' of AR', c: B4 > 0 ? 'r' : 'n' },
     { l: 'Current (Not Due)', v: fmtK(C), s: pct(C, T) + ' of AR', c: 'g' },
     { l: 'Plants Active', v: s.length.toString(), s: s.map(r => r.location).join(' · '), c: 'n' },
   ].map(k => `<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
@@ -1732,7 +1243,7 @@ async function loadCustTrend(customer) {
       ]},
       options: { responsive:true, maintainAspectRatio:false,
         plugins:{ legend:{position:'bottom',labels:{boxWidth:10,font:{size:10}}}, datalabels:{display:false} },
-        scales:{ x:{stacked:true,ticks:{font:{size:11}}}, y:{stacked:true,ticks:{callback:v=>fmtK(v),font:{size:11}}} }
+        scales:{ x:{stacked:true,ticks:{font:{size:9}}}, y:{stacked:true,ticks:{callback:v=>fmtK(v),font:{size:9}}} }
       }
     });
   } catch(e) { document.getElementById('custTrendWrap').classList.add('hidden'); }
@@ -1973,7 +1484,7 @@ function renderWow() {
 async function loadWowWeek(week) {
   if (!week) return;
   try {
-    D.wow = await get(`v_wow_movements?week=eq.${week}&select=*&order=curr_balance.desc&limit=5000`);
+    D.wow = await get(`v_wow_movements?week=eq.${week}&select=*&order=curr_balance.desc`);
   } catch(e) { D.wow = []; }
   filterWow();
 }
@@ -2033,9 +1544,6 @@ document.getElementById('wow-more').addEventListener('click', () => { wowLimit +
 
 // ═══════ BILLINGS ═══════
 let D_billings = [];
-let D_billings_w = [];
-let D_billings_daily = [];
-let D_collections_w = [];
 let D_collections_m = [];
 
 function billPeriodDates(period) {
@@ -2054,38 +1562,23 @@ function billPeriodDates(period) {
 
 async function loadBillings() {
   if (!D_billings.length) {
-    D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc&limit=20000');
-  }
-  if (!D_billings_w.length) {
-    D_billings_w = await get('v_billings_weekly?select=week_start,location,customer,salesperson,invoice_count,billed_amount&order=week_start.desc&limit=10000');
-  }
-  if (!D_billings_daily.length) {
-    D_billings_daily = await get('v_billings_daily_mtd?select=invoice_date,location,customer,salesperson,invoice_count,billed_amount&order=invoice_date.asc');
+    D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc');
   }
   if (!D_collections_m.length) {
-    D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc&limit=20000');
-  }
-  if (!D_collections_w.length) {
-    D_collections_w = await get('v_collections_weekly?select=week_start,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect&order=week_start.desc&limit=10000');
+    D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc');
   }
 }
 
 async function renderBillings() {
   if (!D_billings.length) { ld('Loading billings data...'); await loadBillings(); hideLoader(); }
-  const period  = document.getElementById('bill-period').value;
-  const plant   = document.getElementById('bill-plant').value;
+  const period = document.getElementById('bill-period').value;
+  const plant  = document.getElementById('bill-plant').value;
   const groupBy = document.getElementById('bill-group').value;
-  const gran    = document.getElementById('bill-gran')?.value || 'monthly';
   const [from, to] = billPeriodDates(period);
 
-  // Choose data source based on granularity
-  const isWeekly = gran === 'weekly';
-  const rawData  = isWeekly ? D_billings_w : D_billings;
-  const dateKey  = isWeekly ? 'week_start' : 'month';
-
   // Filter
-  let data = rawData.filter(r => {
-    const d = new Date((r[dateKey]||'').slice(0,10) + 'T00:00:00');
+  let data = D_billings.filter(r => {
+    const d = new Date(r.month + 'T00:00:00');
     return d >= from && d <= to && (plant === 'All' || r.location === plant);
   });
 
@@ -2094,10 +1587,9 @@ async function renderBillings() {
   const totalInvoices = data.reduce((a,r) => a + (+r.invoice_count||0), 0);
   const locations = [...new Set(data.map(r => r.location))];
 
-  // MoM/WoW comparison — most recent period vs prior
-  const periods = [...new Set(data.map(r => (r[dateKey]||'').slice(0,10)))].sort();
-  const thisMonth  = data.filter(r => (r[dateKey]||'').slice(0,10) === periods[periods.length-1]);
-  const priorMonth = data.filter(r => (r[dateKey]||'').slice(0,10) === periods[periods.length-2]);
+  // MoM comparison — current month vs prior month
+  const thisMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-1)[0]);
+  const priorMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-2,-1)[0]);
   const thisMoTotal = thisMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
   const priorMoTotal = priorMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
   const momChg = thisMoTotal - priorMoTotal;
@@ -2234,7 +1726,7 @@ async function renderCollectionsAnalysis() {
   ].map(k => `<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   // Monthly collections by location
-  const months = [...new Set(data.map(r => (r[dateKey]||r.month||'').slice(0,10)))].sort();
+  const months = [...new Set(data.map(r => r.month))].sort();
   const locs   = [...new Set(data.map(r => r.location))].sort();
   const locColors = { 'Brookville': '#8b2332', 'Kilgore': '#d4a24e', 'Wilkes-Barre': '#4a5568' };
   const mLabels = months.map(m => { const d = new Date(m+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'}); });
@@ -2252,7 +1744,7 @@ async function renderCollectionsAnalysis() {
     },
     options: { responsive:true, maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{stacked:true,ticks:{font:{size:11}}},y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}
+      scales:{x:{stacked:true,ticks:{font:{size:9}}},y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}
     }
   });
 
@@ -2276,7 +1768,7 @@ async function renderCollectionsAnalysis() {
     },
     options: { responsive:true, maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{ticks:{font:{size:11}}},y:{ticks:{callback:v=>v+'d'},title:{display:true,text:'Days',font:{size:10}}}}
+      scales:{x:{ticks:{font:{size:9}}},y:{ticks:{callback:v=>v+'d'},title:{display:true,text:'Days',font:{size:10}}}}
     }
   });
 
@@ -2448,18 +1940,10 @@ function switchTab(name) {
   // Lazy-load on first visit
   if (name === 'billings')             renderBillings();
   if (name === 'collections-analysis') renderCollectionsAnalysis();
-  if (name === 'o2c')                  { o2cLoaded = false; renderO2C(); }
-  if (name === 'aging-change')         { renderAgingChange(); }
-  if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); }
+  if (name === 'o2c')                  renderO2C();
+  if (name === 'coll-forecast')        renderForecast();
 }
-document.querySelectorAll('.tab').forEach(t => {
-  t.setAttribute('tabindex', '0');
-  t.setAttribute('role', 'tab');
-  t.addEventListener('click', () => switchTab(t.dataset.tab));
-  t.addEventListener('keydown', e => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(t.dataset.tab); }
-  });
-});
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => switchTab(t.dataset.tab)));
 
 // Filters
 document.getElementById('ctier').addEventListener('change', filterColl);
@@ -2591,37 +2075,31 @@ let o2cRendered  = false;
 let fcTblLimit   = 50;
 let fcTblCache   = [];
 
-async function loadO2CData(forceReload = false) {
-  if (o2cLoaded && !forceReload) return;
-  o2cLoaded = false; // prevent concurrent loads
+async function loadO2CData() {
+  if (o2cLoaded) return;
   document.getElementById('loader').style.display = 'flex';
   document.getElementById('ldmsg').textContent = 'Loading O2C data…';
   try {
     // Supabase REST order syntax: column.asc / column.desc
     // Multiple columns: order=col1.asc,col2.asc
-    const [rev, book, ar, cdtp, oar, sdtp, fcInv, arSum] = await Promise.all([
+    const [rev, book, ar, cdtp, oar, sdtp] = await Promise.all([
       get('v_o2c_monthly_revenue?select=*&order=location.asc,month.asc'),
       get('v_o2c_monthly_bookings?select=*&order=location.asc,month.asc'),
       get('v_o2c_monthly_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      getAll('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
-      get('vw_ar_summary?select=location,total_ar'),
     ]);
-    O2C.revenue   = rev;
-    O2C.bookings  = book;
-    O2C.ar        = ar;
-    O2C.custDtp   = cdtp;
-    O2C.openAr    = oar;
-    O2C.siteDtp   = sdtp;
-    O2C.fcInvoices = fcInv;
-    O2C.arSummary  = arSum;
+    O2C.revenue  = rev;
+    O2C.bookings = book;
+    O2C.ar       = ar;
+    O2C.custDtp  = cdtp;
+    O2C.openAr   = oar;
+    O2C.siteDtp  = sdtp;
     o2cLoaded = true;
     console.log('O2C loaded:',
       'rev:', rev.length, 'book:', book.length, 'ar:', ar.length,
-      'dtp:', cdtp.length, 'openAr:', oar.length, 'siteDtp:', sdtp.length,
-      'fcInvoices:', fcInv.length, 'arSummary:', arSum.length
+      'dtp:', cdtp.length, 'openAr:', oar.length, 'siteDtp:', sdtp.length
     );
   } catch(e) {
     console.error('O2C load error:', e);
@@ -2646,20 +2124,22 @@ async function renderO2C() {
   const entity = document.getElementById('o2c-rev-entity').value;
 
   const rev  = O2C.revenue;
-  // Normalize all month fields to YYYY-MM
-  const revNorm  = (rev||[]).map(r=>({...r, month:(r.month||'').slice(0,7)}));
-  const allMonths = [...new Set(revNorm.map(r=>r.month))].sort();
+  const allMonths = [...new Set(rev.map(r=>r.month))].sort();
 
   // KPIs — LTM Apr 2025 – Mar 2026
-  const ltm    = revNorm.filter(r => r.month >= '2025-04' && r.month <= '2026-03');
+  const ltm    = rev.filter(r => r.month >= '2025-04' && r.month <= '2026-03');
   const ltmRev = ltm.reduce((s,r)=>s+(+r.revenue||0),0);
   const ltmByLoc = loc => ltm.filter(r=>r.location===loc).reduce((s,r)=>s+(+r.revenue||0),0);
+  const ltmCostRev = ltm.filter(r=>r.cost!=null).reduce((s,r)=>s+(+r.revenue||0),0);
+  const ltmCost    = ltm.filter(r=>r.cost!=null).reduce((s,r)=>s+(+r.cost||0),0);
+  const ltmGM = ltmCostRev > 0 ? (ltmCostRev - ltmCost) / ltmCostRev * 100 : null;
 
   document.getElementById('o2c-kpis').innerHTML = [
     {l:'LTM Revenue (All)',  v:fmtK(ltmRev),          s:'Apr 2025 – Mar 2026',     c:'n'},
     {l:'BV LTM Revenue',    v:fmtK(ltmByLoc('Brookville')),   s:ltmRev?(ltmByLoc('Brookville')/ltmRev*100).toFixed(0)+'% of total':'—',c:'n'},
     {l:'KG LTM Revenue',    v:fmtK(ltmByLoc('Kilgore')),      s:ltmRev?(ltmByLoc('Kilgore')/ltmRev*100).toFixed(0)+'% of total':'—',c:'n'},
     {l:'WB LTM Revenue',    v:fmtK(ltmByLoc('Wilkes-Barre')), s:ltmRev?(ltmByLoc('Wilkes-Barre')/ltmRev*100).toFixed(0)+'% of total':'—',c:'n'},
+    {l:'LTM Gross Margin',  v:ltmGM!=null?ltmGM.toFixed(1)+'%':'—', s:'BV + KG only', c:ltmGM!=null&&ltmGM<55?'r':'g'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   // Revenue stacked bar
@@ -2671,72 +2151,66 @@ async function renderO2C() {
       labels: allMonths.map(mLbl),
       datasets: locs.map(loc=>({
         label: loc,
-        data:  allMonths.map(m=>{ const r=revNorm.find(x=>x.location===loc&&x.month===m); return r?+r.revenue:0; }),
+        data:  allMonths.map(m=>{ const r=rev.find(x=>x.location===loc&&x.month===m); return r?+r.revenue:0; }),
         backgroundColor: LOC_COLORS[loc]||'#6b7280',
         stack: 's'
       }))
     },
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{stacked:true,ticks:{font:{size:11},maxRotation:45}},
+      scales:{x:{stacked:true,ticks:{font:{size:9},maxRotation:45}},
               y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}}
+  });
+
+  // Gross margin % line — BV and KG only
+  const bvRev = rev.filter(r=>r.location==='Brookville').sort((a,b)=>a.month>b.month?1:-1);
+  const kgRev = rev.filter(r=>r.location==='Kilgore').sort((a,b)=>a.month>b.month?1:-1);
+  if (charts.o2cMargin) charts.o2cMargin.destroy();
+  charts.o2cMargin = new Chart(document.getElementById('o2cMarginChart'), {
+    type:'line',
+    data:{
+      labels: bvRev.map(r=>mLbl(r.month)),
+      datasets:[
+        {label:'Brookville', data:bvRev.map(r=>r.gross_margin_pct!=null?+r.gross_margin_pct:null),
+          borderColor:'#8b2332',backgroundColor:'rgba(139,35,50,.08)',fill:true,tension:.3,pointRadius:3},
+        {label:'Kilgore',    data:bvRev.map((r,i)=>{ const k=kgRev[i]; return k&&k.gross_margin_pct!=null?+k.gross_margin_pct:null; }),
+          borderColor:'#d4a24e',backgroundColor:'rgba(212,162,78,.08)',fill:false,tension:.3,pointRadius:3},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{grid:{display:false},ticks:{font:{size:9},maxRotation:45}},
+              y:{ticks:{callback:v=>v.toFixed(0)+'%'}}}}
   });
 
   renderO2CBookings();
   renderO2CBillingsColl();
-  renderWaterfall();
 }
 
 function renderO2CBookings() {
-  if (!O2C.bookings || !O2C.revenue) return; // data not loaded yet
   const entity = document.getElementById('o2c-bk-entity').value;
   const bk = O2C.bookings.filter(r=>r.location===entity).sort((a,b)=>a.month>b.month?1:-1);
   const sh = O2C.revenue.filter(r=>r.location===entity).sort((a,b)=>a.month>b.month?1:-1);
-  // Normalize month to YYYY-MM
-  const bkN = bk.map(r=>({...r,month:(r.month||'').slice(0,7)}));
-  const shN = sh.map(r=>({...r,month:(r.month||'').slice(0,7)}));
-  const months = [...new Set([...bkN.map(r=>r.month),...shN.map(r=>r.month)])].sort();
-  const netChange = months.map(m => {
-    const bkV = bkN.find(x=>x.month===m)?.[+entity==='all'?'bookings':'bookings'] || 0;
-    const shV = shN.find(x=>x.month===m)?.revenue || 0;
-    return +bkV - +shV;
-  });
+  const months = [...new Set([...bk.map(r=>r.month),...sh.map(r=>r.month)])].sort();
   if (charts.o2cBook) charts.o2cBook.destroy();
   charts.o2cBook = new Chart(document.getElementById('o2cBookChart'), {
     type:'bar',
     data:{
       labels: months.map(mLbl),
       datasets:[
-        {label:'Bookings',   data:months.map(m=>{ const r=bkN.find(x=>x.month===m); return r?+r.bookings:0; }), backgroundColor:'rgba(74,85,104,.7)', borderRadius:2, order:2},
-        {label:'Shipments',  data:months.map(m=>{ const r=shN.find(x=>x.month===m); return r?+r.revenue:0;   }), backgroundColor:'rgba(139,35,50,.7)', borderRadius:2, order:2},
-        {label:'Net (Book-Ship)', data:netChange, type:'line',
-          borderColor:'#d97706', backgroundColor:'rgba(217,119,6,.12)',
-          borderWidth:2, pointRadius:3, pointBackgroundColor:'#d97706',
-          fill:false, tension:.3, yAxisID:'net', order:1,
-          datalabels:{display:false}},
+        {label:'Bookings',  data:months.map(m=>{ const r=bk.find(x=>x.month===m); return r?+r.bookings:0; }), backgroundColor:'rgba(74,85,104,.7)',borderRadius:2},
+        {label:'Shipments', data:months.map(m=>{ const r=sh.find(x=>x.month===m); return r?+r.revenue:0;   }), backgroundColor:'rgba(139,35,50,.7)',borderRadius:2},
       ]
     },
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}},datalabels:{display:false}},
-      scales:{
-        x:{ticks:{font:{size:11},maxRotation:45}},
-        y:{ticks:{callback:v=>fmtK(v)},title:{display:false}},
-        net:{type:'linear',position:'right',
-          ticks:{callback:v=>fmtK(v),font:{size:11}},
-          grid:{drawOnChartArea:false},
-          title:{display:true,text:'Net',font:{size:11},color:'#d97706'}}
-      }}
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
   });
 }
 
 function renderO2CBillingsColl() {
-  if (!O2C.ar) return;
-  const arData = (O2C.ar||[])
-    .map(r=>({...r, month:(r.month||'').slice(0,7)}))
-    .filter(r=>r.location!=='Wilkes-Barre');
+  const arData = O2C.ar.filter(r=>r.location!=='Wilkes-Barre');
   const months = [...new Set(arData.map(r=>r.month))].sort();
-  if (!months.length) { emptyCanvas('o2cCollChart', 'No collections data available'); return; }
-  clearEmptyCanvas('o2cCollChart');
   if (charts.o2cColl) charts.o2cColl.destroy();
   charts.o2cColl = new Chart(document.getElementById('o2cCollChart'), {
     type:'bar',
@@ -2749,7 +2223,7 @@ function renderO2CBillingsColl() {
     },
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},datalabels:{display:false}},
-      scales:{x:{ticks:{font:{size:11},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
+      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
   });
 }
 
@@ -2759,45 +2233,22 @@ async function renderWaterfall() {
   const to     = (document.getElementById('wf-to').value||'2026-12').slice(0,7);
   const entity = document.getElementById('wf-entity').value;
 
-  // Normalize month to YYYY-MM
-  const arNorm = (O2C.ar||[]).map(r=>({...r, month:(r.month||'').slice(0,7)}));
-  let data = arNorm.filter(r => r.month >= from && r.month <= to && (entity==='all'||r.location===entity));
+  let data = O2C.ar.filter(r => r.month >= from && r.month <= to && (entity==='all'||r.location===entity));
   const months = [...new Set(data.map(r=>r.month))].sort();
-
-  // Aggregate billings + collections per month
-  const agg = months.map(m => {
+  const agg = months.map(m=>{
     const rows = data.filter(r=>r.month===m);
-    return {
-      m,
-      bills: rows.reduce((s,r)=>s+(+r.billings||0), 0),
-      colls: rows.reduce((s,r)=>s+(+r.collections||0), 0),
-    };
+    return {m, bills:rows.reduce((s,r)=>s+(+r.billings||0),0), colls:rows.reduce((s,r)=>s+(+r.collections||0),0), bal:rows.reduce((s,r)=>s+(+r.ar_balance||0),0)};
   });
-
-  // Backwards walk: start from current live AR, subtract net change per month going back
-  // ending_AR[n-1] = ending_AR[n] - billings[n] + collections[n]
-  const currentAR = (O2C.arSummary||[])
-    .filter(r => entity==='all' || r.location===entity)
-    .reduce((s,r) => s+(+r.total_ar||0), 0);
-
-  // Build ending AR for each month by walking backwards from current
-  const endingAR = {};
-  let runningAR = currentAR;
-  // Most recent month = current AR; walk backwards
-  for (let i = agg.length - 1; i >= 0; i--) {
-    endingAR[agg[i].m] = runningAR;
-    runningAR = runningAR - agg[i].bills + agg[i].colls; // prior period
-  }
-
-  const totB    = agg.reduce((s,r)=>s+r.bills, 0);
-  const totC    = agg.reduce((s,r)=>s+r.colls, 0);
-  const effPct  = totB > 0 ? totC/totB*100 : 0;
+  const totB = agg.reduce((s,r)=>s+r.bills,0);
+  const totC = agg.reduce((s,r)=>s+r.colls,0);
+  const lastBal = agg.length?agg[agg.length-1].bal:0;
+  const effPct  = totB>0?totC/totB*100:0;
 
   document.getElementById('wf-kpis').innerHTML=[
-    {l:'Total Billings',   v:fmtK(totB),      s:'Gross invoiced',          c:'n'},
-    {l:'Total Collections',v:fmtK(totC),      s:'BV + KG only',            c:'g'},
+    {l:'Total Billings',   v:fmtK(totB),  s:'Gross invoiced',       c:'n'},
+    {l:'Total Collections',v:fmtK(totC),  s:'BV + KG only',         c:'g'},
     {l:'Collection Rate',  v:effPct.toFixed(1)+'%', s:'Collections ÷ Billings', c:effPct>=100?'g':'n'},
-    {l:'Current Open AR',  v:fmtK(currentAR), s:'Live from AR summary',    c:'n'},
+    {l:'Ending AR Balance',v:fmtK(lastBal),s:'Most recent month',   c:'n'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   if (charts.wf) charts.wf.destroy();
@@ -2808,7 +2259,7 @@ async function renderWaterfall() {
       datasets:[
         {label:'Billings',    data:agg.map(r=>r.bills), backgroundColor:'rgba(74,85,104,.7)',stack:'s'},
         {label:'Collections', data:agg.map(r=>r.colls), backgroundColor:'rgba(22,163,74,.7)', stack:'s2'},
-        {label:'Ending AR',   data:months.map(m=>endingAR[m]||null), type:'line',
+        {label:'AR Balance',  data:agg.map(r=>r.bal>0?r.bal:null), type:'line',
           borderColor:'#8b2332',backgroundColor:'rgba(139,35,50,.08)',
           yAxisID:'bal',tension:.3,pointRadius:3,datalabels:{display:false}},
       ]
@@ -2816,9 +2267,9 @@ async function renderWaterfall() {
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{position:'bottom'},datalabels:{display:false}},
       scales:{
-        x:{ticks:{font:{size:11},maxRotation:45}},
+        x:{ticks:{font:{size:9},maxRotation:45}},
         y:{ticks:{callback:v=>fmtK(v)}},
-        bal:{type:'linear',position:'right',ticks:{callback:v=>fmtK(v),font:{size:11}},
+        bal:{type:'linear',position:'right',ticks:{callback:v=>fmtK(v),font:{size:9}},
           grid:{drawOnChartArea:false},title:{display:true,text:'AR Bal',font:{size:10}}}
       }}
   });
@@ -2877,245 +2328,121 @@ function wkLabel(s) {
 }
 
 // Build aggregate forecast rows from open AR (site-level, by month)
-
-// ═══════════════════════════════════════════════════════
-// COLLECTIONS FORECAST — TWO-LAYER MODEL
-//
-// Layer 1 — Current invoices:
-//   expected_date = MAX(due_date, invoice_date + avg_dtp)
-//   Scenario ± 0.5σ applied. Invoice lands in a specific week.
-//
-// Layer 2 — Overdue invoices:
-//   Distributed across near-term weeks using a decay curve.
-//   Optimistic: front-loaded (faster recovery assumed)
-//   Base:       standard decay
-//   Conservative: spread further out + 15% haircut (some uncollectable)
-//
-// Decay weights by scenario (sum to 1.0):
-//   Week 1  2  3  4  5  6+
-// Opt  .40 .25 .17 .10 .05 .03
-// Base .30 .22 .18 .14 .10 .06
-// Cons .20 .18 .17 .15 .12 .18  (then multiply by 0.85 haircut)
-// ═══════════════════════════════════════════════════════
-
-const DECAY_WEIGHTS = {
-  optimistic:   [0.40, 0.25, 0.17, 0.10, 0.05, 0.03],
-  base:         [0.30, 0.22, 0.18, 0.14, 0.10, 0.06],
-  conservative: [0.20, 0.18, 0.17, 0.15, 0.12, 0.18],
-};
-const OVERDUE_HAIRCUT = { optimistic: 1.0, base: 1.0, conservative: 0.85 };
-
-function buildForecastLayers(scenario, siteFilter, weeks) {
-  const invs = (O2C.fcInvoices||[])
-    .filter(r => siteFilter === 'all' || r.location === siteFilter)
-    .filter(r => +r.invoice_balance > 0);
-
-  const dateField = scenario === 'optimistic'   ? 'expected_date_optimistic'
-                  : scenario === 'conservative'  ? 'expected_date_conservative'
-                  :                               'expected_date_base';
-  const wkField   = scenario === 'optimistic'   ? 'week_optimistic'
-                  : scenario === 'conservative'  ? 'week_conservative'
-                  :                               'week_base';
-
-  // ── Layer 1: current invoices → specific week ──
-  const currentByWeek = {};
-  weeks.forEach(w => currentByWeek[w] = {});
-
-  invs.filter(r => r.invoice_type === 'current').forEach(r => {
-    const wk = r[wkField];
-    if (!wk) return;
-    if (!currentByWeek[wk]) currentByWeek[wk] = {};
-    currentByWeek[wk][r.location] = (currentByWeek[wk][r.location] || 0) + (+r.invoice_balance);
-  });
-
-  // ── Layer 2: overdue invoices → decay distribution ──
-  const overdueByWeek = {};
-  weeks.forEach(w => overdueByWeek[w] = {});
-
-  const weights  = DECAY_WEIGHTS[scenario];
-  const haircut  = OVERDUE_HAIRCUT[scenario];
-  const locs     = ['Brookville', 'Kilgore', 'Wilkes-Barre'];
-
-  locs.forEach(loc => {
-    const overdueInvs = invs.filter(r => r.invoice_type === 'overdue' && r.location === loc);
-    if (!overdueInvs.length) return;
-    const totalOverdue = overdueInvs.reduce((s, r) => s + (+r.invoice_balance), 0) * haircut;
-
-    weeks.slice(0, weights.length).forEach((wk, i) => {
-      const wt = weights[i] || weights[weights.length - 1];
-      if (!overdueByWeek[wk]) overdueByWeek[wk] = {};
-      overdueByWeek[wk][loc] = (overdueByWeek[wk][loc] || 0) + totalOverdue * wt;
-    });
-    // Any remaining weight for weeks beyond the array goes into the last week
-    const usedWeeks = Math.min(weeks.length, weights.length);
-    if (weeks.length > weights.length) {
-      const remainder = weights.slice(usedWeeks).reduce((s, w) => s + w, 0);
-      const lastWk = weeks[weights.length - 1];
-      if (lastWk && overdueByWeek[lastWk]) {
-        overdueByWeek[lastWk][loc] = (overdueByWeek[lastWk][loc] || 0) + totalOverdue * remainder;
-      }
-    }
-  });
-
-  return { currentByWeek, overdueByWeek };
-}
-
-// Kept for backwards compat with renderForecast KPI calcs
-function buildInvoiceForecastRows(scenario, siteFilter) {
-  const dateField = scenario === 'optimistic'   ? 'expected_date_optimistic'
-                  : scenario === 'conservative'  ? 'expected_date_conservative'
-                  :                               'expected_date_base';
-  const wkField   = scenario === 'optimistic'   ? 'week_optimistic'
-                  : scenario === 'conservative'  ? 'week_conservative'
-                  :                               'week_base';
-  return (O2C.fcInvoices||[])
-    .filter(r => (siteFilter === 'all' || r.location === siteFilter) && +r.invoice_balance > 0)
-    .map(r => ({
-      invoice_id:   r.ar_invoice_id,
-      customer:     r.consolidated_customer || '—',
-      location:     r.location,
-      balance:      +r.invoice_balance,
-      invoice_date: r.invoice_date,
-      invoice_type: r.invoice_type,
-      avg:          +r.avg_days,
-      std:          +r.std_days,
-      src:          r.dtp_source,
-      expectedDate: r[dateField],
-      week:         r[wkField],
-    }));
-}
 function buildSiteForecastRows(scenario, siteFilter) {
-  return buildInvoiceForecastRows(scenario, siteFilter);
+  const rows = [];
+  (O2C.openAr||[]).forEach(r => {
+    if (+r.balance <= 0) return;
+    if (siteFilter !== 'all' && r.location !== siteFilter) return;
+    const sd = getSiteDtp(r.location);
+    const dtp = scenarioDtp(sd.avg, sd.std, scenario);
+    const invoiceDate  = r.month + '-15'; // mid-month estimate
+    const expectedDate = addDays(invoiceDate, dtp);
+    rows.push({
+      label:    r.location + ' (' + mLbl(r.month) + ' invoices)',
+      location: r.location,
+      month:    r.month,
+      balance:  +r.balance,
+      avg:      Math.round(sd.avg),
+      std:      Math.round(sd.std),
+      dtp:      Math.round(dtp),
+      src:      'Site avg',
+      expectedDate,
+      week:     weekMonday(expectedDate),
+    });
+  });
+  return rows;
 }
-
 
 async function renderForecast() {
   await loadO2CData();
   fcTblLimit = 50;
 
-  const scenario = document.getElementById('fc-scenario').value;
-  const site     = document.getElementById('fc-site').value;
-  const weeksOut = parseInt(document.getElementById('fc-weeks').value);
-  const weeks    = buildForecastWeeks(weeksOut);
-  const wkLabels = weeks.map(wkLabel);
+  const scenario  = document.getElementById('fc-scenario').value;
+  const site      = document.getElementById('fc-site').value;
+  const weeksOut  = parseInt(document.getElementById('fc-weeks').value);
+  const weeks     = buildForecastWeeks(weeksOut);
+  const wkLabels  = weeks.map(wkLabel);
 
-  // ── KPI calculations ──
-  const allInvs    = (O2C.fcInvoices||[]).filter(r => site==='all'||r.location===site);
-  const overdueInvs = allInvs.filter(r => r.invoice_type === 'overdue');
-  const currentInvs = allInvs.filter(r => r.invoice_type === 'current');
-  if (!allInvs.length) {
-    ['fcWeekChart','fcCumChart','fcSiteChart'].forEach(id => emptyCanvas(id, 'No open invoices for this selection'));
-    showEmpty('fc-kpis', 'No invoice data loaded');
-    return;
-  }
-  ['fcWeekChart','fcCumChart','fcSiteChart'].forEach(clearEmptyCanvas);
-  const totalBal    = allInvs.reduce((s,r)=>s+(+r.invoice_balance),0);
-  const overdueBal  = overdueInvs.reduce((s,r)=>s+(+r.invoice_balance),0);
-  const haircut     = OVERDUE_HAIRCUT[scenario];
+  // Build rows for all 3 scenarios
+  const rowsOpt  = buildSiteForecastRows('optimistic',   site);
+  const rowsBase = buildSiteForecastRows('base',         site);
+  const rowsCons = buildSiteForecastRows('conservative', site);
+  const baseRows = scenario==='optimistic'?rowsOpt : scenario==='conservative'?rowsCons : rowsBase;
 
-  // Build layers for base scenario (for KPI calc)
-  const { currentByWeek, overdueByWeek } = buildForecastLayers(scenario, site, weeks);
-  const next4wCurrent  = weeks.slice(0,4).reduce((s,w)=>s+Object.values(currentByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
-  const next4wOverdue  = weeks.slice(0,4).reduce((s,w)=>s+Object.values(overdueByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
-  const next4w         = next4wCurrent + next4wOverdue;
-  const next4w8w       = weeks.slice(4,8).reduce((s,w)=>s
-    +Object.values(currentByWeek[w]||{}).reduce((a,b)=>a+b,0)
-    +Object.values(overdueByWeek[w]||{}).reduce((a,b)=>a+b,0),0);
+  // KPIs
+  const total  = baseRows.reduce((s,r)=>s+r.balance, 0);
+  const next4w = baseRows.filter(r=>weeks.slice(0,4).includes(r.week)).reduce((s,r)=>s+r.balance,0);
+  const next8w = baseRows.filter(r=>weeks.slice(0,8).includes(r.week)).reduce((s,r)=>s+r.balance,0);
+  const beyond = baseRows.filter(r=>!weeks.includes(r.week)).reduce((s,r)=>s+r.balance,0);
+  const siteAvgDisplay = site==='all'
+    ? 'Multi-site weighted'
+    : (getSiteDtp(site).avg.toFixed(0)+'d site avg');
 
   document.getElementById('fc-kpis').innerHTML = [
-    {l:'Total Open AR',        v:fmtK(totalBal),              s:(site==='all'?'All sites':site),      c:'n'},
-    {l:'Overdue Balance',      v:fmtK(overdueBal),            s:overdueInvs.length+' invoices past due', c:'r'},
-    {l:'Current Pipeline',     v:fmtK(totalBal - overdueBal), s:currentInvs.length+' invoices',       c:'n'},
-    {l:'Expected Next 4 Wks',  v:fmtK(next4w),                s:(totalBal?(next4w/totalBal*100).toFixed(0)+'% of AR':'—'), c:'g'},
-    {l:'Expected Wks 5–8',     v:fmtK(next4w8w),              s:'Incremental',                        c:'n'},
+    {l:'Total Open AR',         v:fmtK(total),       s:site==='all'?'All sites':site,c:'n'},
+    {l:'Expected Next 4 Wks',   v:fmtK(next4w),      s:total>0?(next4w/total*100).toFixed(0)+'% of open AR':'—',c:'g'},
+    {l:'Expected Wks 5–8',      v:fmtK(next8w-next4w),s:'Incremental',c:'n'},
+    {l:'Beyond Window',         v:fmtK(beyond),      s:'After '+weeksOut+'w horizon',c:beyond>0?'r':'n'},
+    {l:'DTP Reference',         v:siteAvgDisplay,    s:'Base scenario avg',c:'n'},
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   document.getElementById('fc-chart-sub').textContent =
-    scenario.charAt(0).toUpperCase()+scenario.slice(1)+' · '+(site==='all'?'All sites':site)
-    +' · Striped = overdue recovery';
+    scenario.charAt(0).toUpperCase()+scenario.slice(1)+' · '+(site==='all'?'All sites':site);
 
-  const siteLocs = site==='all' ? ['Brookville','Kilgore','Wilkes-Barre'] : [site];
-
-  // ── Weekly chart: stacked current + overdue per site ──
+  // Weekly stacked bar by site
+  const siteLocs = site==='all'?['Brookville','Kilgore','Wilkes-Barre']:[site];
   if (charts.fcWeek) charts.fcWeek.destroy();
   charts.fcWeek = new Chart(document.getElementById('fcWeekChart'), {
-    type: 'bar',
-    data: {
+    type:'bar',
+    data:{
       labels: wkLabels,
-      datasets: [
-        // Current invoices — solid
-        ...siteLocs.map(loc => ({
-          label:           loc + ' (current)',
-          data:            weeks.map(w => currentByWeek[w]?.[loc] || 0),
-          backgroundColor: LOC_COLORS[loc] || '#6b7280',
-          stack:           'total',
-          borderRadius:    2,
-        })),
-        // Overdue recovery — same color, pattern via lower opacity + border
-        ...siteLocs.map(loc => ({
-          label:           loc + ' (overdue)',
-          data:            weeks.map(w => overdueByWeek[w]?.[loc] || 0),
-          backgroundColor: (LOC_COLORS[loc] || '#6b7280') + '55',  // 33% opacity
-          borderColor:     LOC_COLORS[loc] || '#6b7280',
-          borderWidth:     1,
-          borderDash:      [4, 2],
-          stack:           'total',
-        })),
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } }, datalabels: { display: false } },
-      scales: { x: { stacked: true, ticks: { font:{size:11}, maxRotation: 45 } },
-                y: { stacked: true, ticks: { callback: v => fmtK(v) } } }
-    }
-  });
-
-  // ── Cumulative chart — all 3 scenarios ──
-  function cumTotal(scen) {
-    const { currentByWeek: c, overdueByWeek: o } = buildForecastLayers(scen, site, weeks);
-    let t = 0;
-    return weeks.map(w => {
-      t += siteLocs.reduce((s, loc) => s + (c[w]?.[loc]||0) + (o[w]?.[loc]||0), 0);
-      return t;
-    });
-  }
-  if (charts.fcCum) charts.fcCum.destroy();
-  charts.fcCum = new Chart(document.getElementById('fcCumChart'), {
-    type: 'line',
-    data: {
-      labels: wkLabels,
-      datasets: [
-        { label: 'Optimistic',   data: cumTotal('optimistic'),   borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,.08)',  fill: true,  tension: .3, pointRadius: 2, borderWidth: 2 },
-        { label: 'Base',         data: cumTotal('base'),         borderColor: '#4a5568', backgroundColor: 'rgba(74,85,104,.08)', fill: false, tension: .3, pointRadius: 2, borderWidth: 2, borderDash: [4,3] },
-        { label: 'Conservative', data: cumTotal('conservative'), borderColor: '#dc2626', backgroundColor: 'rgba(220,38,38,.05)', fill: false, tension: .3, pointRadius: 2, borderWidth: 2, borderDash: [2,4] },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
-      scales: { x: { ticks: { font:{size:11}, maxRotation: 45 } }, y: { ticks: { callback: v => fmtK(v) } } }
-    }
-  });
-
-  // ── By-site weekly chart — current only, cleaner read ──
-  if (charts.fcSite) charts.fcSite.destroy();
-  charts.fcSite = new Chart(document.getElementById('fcSiteChart'), {
-    type: 'bar',
-    data: {
-      labels: wkLabels,
-      datasets: ['Brookville','Kilgore','Wilkes-Barre'].map(loc => ({
-        label:           loc,
-        data:            weeks.map(w => (currentByWeek[w]?.[loc]||0) + (overdueByWeek[w]?.[loc]||0)),
-        backgroundColor: LOC_COLORS[loc] || '#6b7280',
-        borderRadius:    2,
+      datasets: siteLocs.map(loc=>({
+        label: loc,
+        data:  weeks.map(w=>baseRows.filter(r=>r.location===loc&&r.week===w).reduce((s,r)=>s+r.balance,0)),
+        backgroundColor: LOC_COLORS[loc]||'#6b7280',
+        stack:'s'
       }))
     },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
-      scales: { x: { ticks: { font:{size:11}, maxRotation: 45 } }, y: { ticks: { callback: v => fmtK(v) } } }
-    }
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{stacked:true,ticks:{font:{size:9},maxRotation:45}},
+              y:{stacked:true,ticks:{callback:v=>fmtK(v)}}}}
+  });
+
+  // Cumulative — all 3 scenarios
+  function cumSum(rows,wks){ let t=0; return wks.map(w=>{t+=rows.filter(r=>r.week===w).reduce((s,r)=>s+r.balance,0);return t;}); }
+  if (charts.fcCum) charts.fcCum.destroy();
+  charts.fcCum = new Chart(document.getElementById('fcCumChart'), {
+    type:'line',
+    data:{
+      labels: wkLabels,
+      datasets:[
+        {label:'Optimistic',   data:cumSum(rowsOpt, weeks), borderColor:'#16a34a',backgroundColor:'rgba(22,163,74,.08)',  fill:true, tension:.3,pointRadius:2,borderWidth:2},
+        {label:'Base',         data:cumSum(rowsBase,weeks), borderColor:'#4a5568',backgroundColor:'rgba(74,85,104,.08)',  fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[4,3]},
+        {label:'Conservative', data:cumSum(rowsCons,weeks), borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.05)', fill:false,tension:.3,pointRadius:2,borderWidth:2,borderDash:[2,4]},
+      ]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
+  });
+
+  // All-sites weekly side-by-side
+  if (charts.fcSite) charts.fcSite.destroy();
+  charts.fcSite = new Chart(document.getElementById('fcSiteChart'), {
+    type:'bar',
+    data:{
+      labels: wkLabels,
+      datasets:['Brookville','Kilgore','Wilkes-Barre'].map(loc=>({
+        label: loc,
+        data:  weeks.map(w=>rowsBase.filter(r=>r.location===loc&&r.week===w).reduce((s,r)=>s+r.balance,0)),
+        backgroundColor: LOC_COLORS[loc]||'#6b7280',
+        borderRadius:2,
+      }))
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'bottom'},datalabels:{display:false}},
+      scales:{x:{ticks:{font:{size:9},maxRotation:45}},y:{ticks:{callback:v=>fmtK(v)}}}}
   });
 
   renderForecastTable();
@@ -3126,66 +2453,74 @@ function renderForecastTable() {
   const site     = document.getElementById('fc-tbl-site').value;
   const search   = (document.getElementById('fc-tbl-search').value||'').toLowerCase().trim();
 
-  // Build rows directly from invoice-level data
-  const dateField = scenario==='optimistic' ? 'expected_date_optimistic'
-                  : scenario==='conservative' ? 'expected_date_conservative'
-                  : 'expected_date_base';
-  const wkField   = scenario==='optimistic' ? 'week_optimistic'
-                  : scenario==='conservative' ? 'week_conservative'
-                  : 'week_base';
+  // Build customer-level rows from custDtp + openAr
+  // For each site's open AR balance, distribute proportionally by customer invoice count
+  const allRows = [];
+  const siteLocs = site==='all' ? ['Brookville','Kilgore','Wilkes-Barre'] : [site];
 
-  let rows = (O2C.fcInvoices||[])
-    .filter(r => (site==='all' || r.location===site) && +r.invoice_balance > 0)
-    .map(r => ({
-      invoice_id:  r.ar_invoice_id,
-      customer:    r.consolidated_customer || '—',
-      location:    r.location,
-      balance:     +r.invoice_balance,
-      invoice_date: r.invoice_date,
-      avg:         +r.avg_days,
-      std:         +r.std_days,
-      src:         r.dtp_source === 'customer' ? 'Customer' : 'Site avg',
-      expOpt:      r.expected_date_optimistic,
-      expBase:     r.expected_date_base,
-      expCons:     r.expected_date_conservative,
-      wkOpt:       r.week_optimistic,
-      wkBase:      r.week_base,
-      wkCons:      r.week_conservative,
-      expScenario: r[dateField],
-      wkScenario:  r[wkField],
-    }));
+  siteLocs.forEach(loc => {
+    const siteOpen   = (O2C.openAr||[]).filter(r=>r.location===loc&&+r.balance>0);
+    const totalBal   = siteOpen.reduce((s,r)=>s+(+r.balance||0),0);
+    if (!totalBal) return;
 
+    // Get customers for this site with invoice history
+    const custData = (O2C.custDtp||[]).filter(r=>r.location===loc).slice(0,60);
+    const totalInv = custData.reduce((s,r)=>s+(+r.invoice_count||0),0);
+    if (!totalInv) return;
+
+    custData.forEach(c => {
+      const share   = +c.invoice_count / totalInv;
+      const estBal  = totalBal * share;
+      if (estBal < 500) return;
+
+      const avg = +c.avg_days;
+      const std = +c.std_days;
+      const dtpO = scenarioDtp(avg, std, 'optimistic');
+      const dtpB = scenarioDtp(avg, std, 'base');
+      const dtpC = scenarioDtp(avg, std, 'conservative');
+
+      // Use most recent open month as invoice date reference
+      const refMonth   = siteOpen.length ? siteOpen[siteOpen.length-1].month : new Date().toISOString().slice(0,7);
+      const refDate    = refMonth + '-15';
+
+      allRows.push({
+        customer: c.customer_name,
+        location: loc,
+        balance:  Math.round(estBal),
+        avg:      Math.round(avg),
+        std:      Math.round(std),
+        src:      c.dtp_source==='customer'?('Customer ('+c.invoice_count+'inv)'):'Site avg',
+        expOpt:   addDays(refDate, dtpO),
+        expBase:  addDays(refDate, dtpB),
+        expCons:  addDays(refDate, dtpC),
+        wkOpt:    weekMonday(addDays(refDate, dtpO)),
+        wkBase:   weekMonday(addDays(refDate, dtpB)),
+        wkCons:   weekMonday(addDays(refDate, dtpC)),
+      });
+    });
+  });
+
+  let rows = allRows;
   if (search) rows = rows.filter(r =>
-    (r.customer||'').toLowerCase().includes(search) ||
-    (r.location||'').toLowerCase().includes(search) ||
-    (r.invoice_id||'').toLowerCase().includes(search)
+    r.customer.toLowerCase().includes(search) ||
+    r.location.toLowerCase().includes(search)
   );
-  rows.sort((a,b) => (a.expScenario||'').localeCompare(b.expScenario||''));
+  rows.sort((a,b) => a.expBase.localeCompare(b.expBase));
   fcTblCache = rows;
 
   const show = rows.slice(0, fcTblLimit);
-  const fmtD = s => {
-    if (!s) return '—';
-    const d = new Date(s + 'T00:00:00');
-    return d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-  };
-  const wkOf = s => {
-    if (!s) return '—';
-    const d = new Date(s + 'T00:00:00');
-    return 'Wk ' + d.toLocaleDateString('en-US', {month:'short', day:'numeric'});
-  };
-  const pastDue = s => s && s < new Date().toISOString().slice(0,10);
+  const fmtD = s => { if(!s) return '—'; const d=new Date(s+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+  const wkOf = s => { if(!s) return '—'; const d=new Date(s+'T00:00:00'); return 'Wk '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
 
-  document.getElementById('fc-tbl-body').innerHTML = show.map(r => `<tr>
-    <td><strong>${r.customer}</strong><br><span style="font-size:10px;color:var(--text2);font-family:monospace">${(r.invoice_id||'').trim()}</span></td>
+  document.getElementById('fc-tbl-body').innerHTML = show.map(r=>`<tr>
+    <td><strong>${r.customer}</strong></td>
     <td>${r.location}</td>
     <td class="amt">${fmtK(r.balance)}</td>
-    <td class="amt" style="font-size:11px;color:var(--text2)">${r.invoice_date||'—'}</td>
     <td class="amt">${r.avg}d</td>
     <td class="amt">${r.std}d</td>
     <td><span style="font-size:10px;padding:2px 6px;border-radius:8px;background:var(--bg3);color:var(--text2)">${r.src}</span></td>
     <td class="amt" style="color:var(--green)">${fmtD(r.expOpt)}</td>
-    <td class="amt" style="${pastDue(r.expBase)?'color:var(--red);font-weight:700':''}">${fmtD(r.expBase)}</td>
+    <td class="amt">${fmtD(r.expBase)}</td>
     <td class="amt" style="color:var(--red)">${fmtD(r.expCons)}</td>
     <td class="amt" style="font-size:11px;color:var(--green)">${wkOf(r.wkOpt)}</td>
     <td class="amt" style="font-size:11px">${wkOf(r.wkBase)}</td>
@@ -3194,7 +2529,7 @@ function renderForecastTable() {
 
   const more = document.getElementById('fc-tbl-more');
   more.classList.toggle('hidden', rows.length <= fcTblLimit);
-  more.textContent = 'Show more… (' + (rows.length - fcTblLimit) + ' remaining)';
+  more.textContent = 'Show more… ('+(rows.length - fcTblLimit)+' remaining)';
 }
 
 // ── O2C cache invalidation on refresh ─────────────────
@@ -3205,162 +2540,6 @@ async function refreshAll() {
   await _origRefreshAll();
 }
 
-
-
-// ═══════════════════════════════════════════════════════
-// COLLECTIONS FORECAST EXPORT
-// Exports weekly by site — formatted for 13-week CF model
-// ═══════════════════════════════════════════════════════
-
-function buildForecastExportData() {
-  const scenario  = document.getElementById('fc-scenario').value;
-  const site      = document.getElementById('fc-site').value;
-  const weeksOut  = parseInt(document.getElementById('fc-weeks').value);
-  const weeks     = buildForecastWeeks(weeksOut);
-  const { currentByWeek, overdueByWeek } = buildForecastLayers(scenario, site, weeks);
-  const siteLocs  = site === 'all' ? ['Brookville', 'Kilgore', 'Wilkes-Barre'] : [site];
-
-  // Layout: sites as ROWS, weeks as COLUMNS
-  // Rows: for each site → Current, Overdue, Total; then Grand Total
-  const wkLabels = weeks.map(w => {
-    const d = new Date(w + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  });
-
-  const scenarioLabel = scenario.charAt(0).toUpperCase() + scenario.slice(1);
-  const siteLabel     = site === 'all' ? 'All Sites' : site;
-
-  // Header row: Site | Type | Wk1 | Wk2 | ...
-  const header = ['Site', 'Type', ...wkLabels, 'Total'];
-
-  const dataRows = [];
-
-  siteLocs.forEach(loc => {
-    const currRow  = [loc, 'Current'];
-    const ovdRow   = [loc, 'Overdue'];
-    const totRow   = [loc, 'Total'];
-    let currTotal  = 0, ovdTotal = 0;
-
-    weeks.forEach(w => {
-      const c = Math.round(currentByWeek[w]?.[loc] || 0);
-      const o = Math.round(overdueByWeek[w]?.[loc] || 0);
-      currRow.push(c); ovdRow.push(o); totRow.push(c + o);
-      currTotal += c;  ovdTotal += o;
-    });
-    currRow.push(currTotal);
-    ovdRow.push(ovdTotal);
-    totRow.push(currTotal + ovdTotal);
-
-    dataRows.push(currRow, ovdRow, totRow);
-  });
-
-  // Grand total row
-  const grandRow = ['Grand Total', ''];
-  let grandTotal = 0;
-  weeks.forEach((w, i) => {
-    const wTotal = siteLocs.reduce((s, loc) =>
-      s + Math.round((currentByWeek[w]?.[loc]||0) + (overdueByWeek[w]?.[loc]||0)), 0);
-    grandRow.push(wTotal);
-    grandTotal += wTotal;
-  });
-  grandRow.push(grandTotal);
-  dataRows.push(grandRow);
-
-  return { header, dataRows, scenarioLabel, siteLabel };
-}
-
-function exportForecastCSV() {
-  const { header, dataRows, scenarioLabel, siteLabel } = buildForecastExportData();
-  const scenario = document.getElementById('fc-scenario').value;
-  const site     = document.getElementById('fc-site').value;
-
-  const lines = [];
-  // Metadata (no blank rows — just 3 tight header lines)
-  lines.push('"Collections Forecast","Scenario: ' + scenarioLabel + '","Site: ' + siteLabel + '","Generated: ' + new Date().toLocaleDateString('en-US') + '"');
-  lines.push('');
-  // Column headers
-  lines.push(header.map(c => '"' + c + '"').join(','));
-  // Data
-  dataRows.forEach(row => {
-    lines.push(row.map((v, i) => {
-      if (i < 2) return '"' + String(v) + '"';
-      return typeof v === 'number' ? v : '"' + String(v) + '"';
-    }).join(','));
-  });
-
-  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function exportForecastExcel() {
-  const { header, dataRows, scenarioLabel, siteLabel } = buildForecastExportData();
-  const scenario = document.getElementById('fc-scenario').value;
-  const site     = document.getElementById('fc-site').value;
-
-  // Use SheetJS (loaded via CDN) for true xlsx output
-  if (typeof XLSX === 'undefined') {
-    alert('Loading Excel library — please try again in a moment.');
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-    s.onload = exportForecastExcel;
-    document.head.appendChild(s);
-    return;
-  }
-
-  const wb = XLSX.utils.book_new();
-
-  // Build array of arrays for the sheet
-  const sheetData = [];
-
-  // Metadata
-  sheetData.push(['Collections Forecast']);
-  sheetData.push(['Scenario: ' + scenarioLabel + '   |   Site: ' + siteLabel
-    + '   |   Generated: ' + new Date().toLocaleDateString('en-US')]);
-  sheetData.push([]); // one blank row
-
-  // Header
-  sheetData.push(header);
-
-  // Data rows
-  dataRows.forEach(row => sheetData.push(row));
-
-  const ws = XLSX.utils.aoa_to_sheet(sheetData);
-
-  // Column widths
-  ws['!cols'] = [{ wch: 18 }, { wch: 10 }];
-  for (let i = 2; i < header.length; i++) ws['!cols'].push({ wch: 14 });
-
-  // Style header row (row index 3 = 0-based)
-  const headerRowIdx = 3;
-  header.forEach((_, ci) => {
-    const cellRef = XLSX.utils.encode_cell({ r: headerRowIdx, c: ci });
-    if (!ws[cellRef]) return;
-    ws[cellRef].s = {
-      font:    { bold: true, color: { rgb: 'FFFFFF' } },
-      fill:    { fgColor: { rgb: '1F4E79' } },
-      alignment: { horizontal: 'center' }
-    };
-  });
-
-  // Style Grand Total row
-  const grandRowIdx = sheetData.length - 1;
-  header.forEach((_, ci) => {
-    const cellRef = XLSX.utils.encode_cell({ r: grandRowIdx, c: ci });
-    if (!ws[cellRef]) return;
-    ws[cellRef].s = {
-      font: { bold: true, color: { rgb: 'FFFFFF' } },
-      fill: { fgColor: { rgb: '1F4E79' } }
-    };
-  });
-
-  XLSX.utils.book_append_sheet(wb, ws, 'Collections Forecast');
-  XLSX.writeFile(wb, 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.xlsx');
-}
 
 </script>
 </body>
