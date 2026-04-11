@@ -204,6 +204,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <span class="tgl">AR Detail</span>
   <div class="tab active" data-tab="ov">Overview</div>
   <div class="tab" data-tab="coll">Collection Actions</div>
+  <div class="tab" data-tab="aging-change">Aging Change</div>
   <div class="tab" data-tab="cust">Customer Detail</div>
   <div class="tab" data-tab="sp">Salesperson</div>
   <div class="tab" data-tab="wow">&#128200; AR Movements</div>
@@ -315,6 +316,39 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   </div>
 </div>
 
+<!-- ══════════════ AGING CHANGE ══════════════ -->
+<div class="panel" id="panel-aging-change">
+  <div class="krow" id="aging-chg-kpis"></div>
+  <div class="sec">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Aging Change — Last 6 Months</div>
+        <div class="ssub">Change in 60+ and 90+ day balances vs ~26 weeks ago · Top 30 customers individually, all others grouped</div>
+      </div>
+      <div style="display:flex;gap:4px">
+        <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">60+ Days</button>
+        <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">90+ Days</button>
+      </div>
+    </div>
+    <div id="agc-chart-60" style="position:relative;height:400px;padding:16px"><canvas id="agcChart60"></canvas></div>
+    <div id="agc-chart-90" style="position:relative;height:400px;padding:16px;display:none"><canvas id="agcChart90"></canvas></div>
+  </div>
+  <div class="sec" style="margin-top:16px">
+    <div class="shdr"><div class="stitle">Detail Table</div></div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Customer</th><th>Site</th><th>Salesperson</th>
+          <th class="amt">Total AR</th>
+          <th class="amt">60+ Now</th><th class="amt">60+ Prior</th><th class="amt">60+ Change</th>
+          <th class="amt">90+ Now</th><th class="amt">90+ Prior</th><th class="amt">90+ Change</th>
+        </tr></thead>
+        <tbody id="agc-table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════════ CUSTOMER DETAIL ══════════════ -->
 <div class="panel" id="panel-cust">
   <div class="frow">
@@ -406,6 +440,12 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   </div>
   <div class="krow" id="bill-kpis"></div>
   <div class="frow">
+    <div class="fg"><label>Granularity:</label>
+      <select id="bill-gran" onchange="renderBillings()">
+        <option value="monthly" selected>Monthly</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
     <div class="fg"><label>Period:</label>
       <select id="bill-period">
         <option value="MTD">Month to Date</option>
@@ -436,6 +476,10 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     </div>
   </div>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+    <div class="sec" id="bill-daily-sec" style="margin-bottom:20px">
+      <div class="shdr"><div class="stitle">Daily Billings — MTD</div><div class="ssub" id="bill-daily-sub"></div></div>
+      <div style="position:relative;height:260px;padding:16px"><canvas id="billDailyChart"></canvas></div>
+    </div>
     <div class="sec">
       <div class="shdr"><div class="stitle">Top Customers by Billings</div></div>
       <div style="overflow-x:auto"><table><thead><tr>
@@ -455,6 +499,12 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 <div class="panel" id="panel-collections-analysis">
   <div class="krow" id="coll-an-kpis"></div>
   <div class="frow">
+    <div class="fg"><label>Granularity:</label>
+      <select id="ca-gran" onchange="renderCollectionsAnalysis()">
+        <option value="monthly" selected>Monthly</option>
+        <option value="weekly">Weekly</option>
+      </select>
+    </div>
     <div class="fg"><label>Period:</label>
       <select id="ca-period">
         <option value="L3">Last 3 Months</option>
@@ -904,6 +954,148 @@ function clearEmptyCanvas(canvasId) {
   canvas.style.display = '';
   const existing = canvas.parentElement?.querySelector('.empty-state');
   if (existing) existing.remove();
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// AGING CHANGE — L6M
+// ══════════════════════════════════════════════════════════════════
+let D_aging_change = [];
+
+async function loadAgingChange() {
+  if (!D_aging_change.length) {
+    D_aging_change = await getAll('v_aging_change_l6m?select=*&order=ar_rank.asc');
+  }
+}
+
+function setAgcView(view) {
+  ['60','90'].forEach(v => {
+    document.getElementById('agc-chart-' + v).style.display = v === view ? '' : 'none';
+    const btn = document.getElementById('agc-view-' + v);
+    if (btn) {
+      btn.style.background = v === view ? 'var(--accent)' : 'var(--bg3)';
+      btn.style.color      = v === view ? '#fff' : 'var(--text)';
+    }
+  });
+  if (charts['agcChart' + view]) charts['agcChart' + view].resize();
+}
+
+async function renderAgingChange() {
+  await loadAgingChange();
+  const data = D_aging_change;
+  if (!data.length) { showEmpty('aging-chg-kpis', 'No aging change data available'); return; }
+
+  // KPIs
+  const totCurr60  = data.reduce((s,r)=>s+(+r.curr_over_60||0),0);
+  const totPrior60 = data.reduce((s,r)=>s+(+r.prior_over_60||0),0);
+  const totCurr90  = data.reduce((s,r)=>s+(+r.curr_over_90||0),0);
+  const totPrior90 = data.reduce((s,r)=>s+(+r.prior_over_90||0),0);
+  const chg60 = totCurr60 - totPrior60;
+  const chg90 = totCurr90 - totPrior90;
+
+  document.getElementById('aging-chg-kpis').innerHTML = [
+    { l: 'Total 60+ Days',   v: fmtK(totCurr60),  s: (chg60>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg60))+' vs 6mo ago', c: chg60>0?'r':'g' },
+    { l: 'Total 90+ Days',   v: fmtK(totCurr90),  s: (chg90>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg90))+' vs 6mo ago', c: chg90>0?'r':'g' },
+    { l: 'Prior 60+ (6mo)',  v: fmtK(totPrior60), s: 'Approx 26 weeks ago', c: 'n' },
+    { l: 'Prior 90+ (6mo)',  v: fmtK(totPrior90), s: 'Approx 26 weeks ago', c: 'n' },
+  ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
+
+  // Chart helper — horizontal bar showing current vs change
+  const renderAgcChart = (canvasId, currKey, chgKey, label) => {
+    const top = data.filter(r=>r.customer!=='All Others').slice(0,20);
+    const others = data.find(r=>r.customer==='All Others');
+    const rows = others ? [...top, others] : top;
+
+    const labels   = rows.map(r => r.customer === 'All Others' ? 'All Others' : r.customer);
+    const currVals = rows.map(r => +r[currKey]||0);
+    const chgVals  = rows.map(r => +r[chgKey]||0);
+    const chgColors = chgVals.map(v => v > 0 ? 'rgba(220,38,38,.7)' : 'rgba(22,163,74,.7)');
+
+    if (charts[canvasId]) charts[canvasId].destroy();
+    charts[canvasId] = new Chart(document.getElementById(canvasId), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [
+          { label: 'Current ' + label, data: currVals, backgroundColor: 'rgba(139,35,50,.55)', borderRadius: 2 },
+          { label: 'Change vs 6mo ago', data: chgVals, backgroundColor: chgColors, borderRadius: 2 },
+        ]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
+        scales: {
+          x: { ticks: { callback: v => fmtK(v), font: { size: 11 } } },
+          y: { ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  };
+
+  renderAgcChart('agcChart60', 'curr_over_60', 'change_over_60', '60+ Days');
+  renderAgcChart('agcChart90', 'curr_over_90', 'change_over_90', '90+ Days');
+
+  // Table
+  document.getElementById('agc-table-body').innerHTML = data.map(r => {
+    const chg60Color = +r.change_over_60 > 0 ? 'color:var(--red)' : +r.change_over_60 < 0 ? 'color:var(--green)' : '';
+    const chg90Color = +r.change_over_90 > 0 ? 'color:var(--red)' : +r.change_over_90 < 0 ? 'color:var(--green)' : '';
+    const chgFmt = (v) => v === 0 ? '—' : (v > 0 ? '+' : '') + fmtK(v);
+    return `<tr${r.customer==='All Others'?' style="font-weight:600;background:var(--bg3)"':''}>
+      <td><strong>${r.customer}</strong></td>
+      <td>${r.location||'—'}</td>
+      <td>${r.salesperson||'—'}</td>
+      <td class="amt">${fmtK(+r.total_ar)}</td>
+      <td class="amt">${fmtK(+r.curr_over_60)}</td>
+      <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_60)}</td>
+      <td class="amt" style="${chg60Color};font-weight:600">${chgFmt(+r.change_over_60)}</td>
+      <td class="amt">${fmtK(+r.curr_over_90)}</td>
+      <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_90)}</td>
+      <td class="amt" style="${chg90Color};font-weight:600">${chgFmt(+r.change_over_90)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// Daily billings MTD chart
+async function renderBillingsDailyMTD() {
+  if (!D_billings_daily.length) return;
+  const plant = document.getElementById('bill-plant')?.value || 'All';
+  const data  = D_billings_daily.filter(r => plant === 'All' || r.location === plant);
+  const days  = [...new Set(data.map(r=>r.invoice_date))].sort();
+
+  if (!days.length) {
+    emptyCanvas('billDailyChart', 'No daily billings data for MTD');
+    document.getElementById('bill-daily-sub').textContent = '';
+    return;
+  }
+  clearEmptyCanvas('billDailyChart');
+
+  const locs = ['Brookville','Kilgore','Wilkes-Barre'];
+  const mtdTotal = data.reduce((s,r)=>s+(+r.billed_amount||0),0);
+  document.getElementById('bill-daily-sub').textContent =
+    'MTD Total: ' + fmtK(mtdTotal) + ' · ' + days.length + ' billing days';
+
+  if (charts.billDaily) charts.billDaily.destroy();
+  charts.billDaily = new Chart(document.getElementById('billDailyChart'), {
+    type: 'bar',
+    data: {
+      labels: days.map(d => new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'})),
+      datasets: locs.map(loc => ({
+        label: loc,
+        data: days.map(d => data.filter(r=>r.invoice_date===d&&r.location===loc).reduce((s,r)=>s+(+r.billed_amount||0),0)),
+        backgroundColor: LOC_COLORS[loc] || '#6b7280',
+        stack: 's', borderRadius: 2,
+      }))
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
+      scales: {
+        x: { stacked: true, ticks: { font: { size: 11 } } },
+        y: { stacked: true, ticks: { callback: v => fmtK(v) } }
+      }
+    }
+  });
 }
 
 async function loadAll() {
@@ -1650,6 +1842,9 @@ document.getElementById('wow-more').addEventListener('click', () => { wowLimit +
 
 // ═══════ BILLINGS ═══════
 let D_billings = [];
+let D_billings_w = [];
+let D_billings_daily = [];
+let D_collections_w = [];
 let D_collections_m = [];
 
 function billPeriodDates(period) {
@@ -1670,21 +1865,36 @@ async function loadBillings() {
   if (!D_billings.length) {
     D_billings = await get('v_billings_monthly?select=month,location,customer,salesperson,invoice_count,billed_amount&order=month.desc&limit=20000');
   }
+  if (!D_billings_w.length) {
+    D_billings_w = await get('v_billings_weekly?select=week_start,location,customer,salesperson,invoice_count,billed_amount&order=week_start.desc&limit=10000');
+  }
+  if (!D_billings_daily.length) {
+    D_billings_daily = await get('v_billings_daily_mtd?select=invoice_date,location,customer,salesperson,invoice_count,billed_amount&order=invoice_date.asc');
+  }
   if (!D_collections_m.length) {
     D_collections_m = await get('v_collections_monthly?select=month,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect,avg_days_late,paid_on_time,paid_late&order=month.desc&limit=20000');
+  }
+  if (!D_collections_w.length) {
+    D_collections_w = await get('v_collections_weekly?select=week_start,location,customer,salesperson,invoices_collected,amount_collected,avg_days_to_collect&order=week_start.desc&limit=10000');
   }
 }
 
 async function renderBillings() {
   if (!D_billings.length) { ld('Loading billings data...'); await loadBillings(); hideLoader(); }
-  const period = document.getElementById('bill-period').value;
-  const plant  = document.getElementById('bill-plant').value;
+  const period  = document.getElementById('bill-period').value;
+  const plant   = document.getElementById('bill-plant').value;
   const groupBy = document.getElementById('bill-group').value;
+  const gran    = document.getElementById('bill-gran')?.value || 'monthly';
   const [from, to] = billPeriodDates(period);
 
+  // Choose data source based on granularity
+  const isWeekly = gran === 'weekly';
+  const rawData  = isWeekly ? D_billings_w : D_billings;
+  const dateKey  = isWeekly ? 'week_start' : 'month';
+
   // Filter
-  let data = D_billings.filter(r => {
-    const d = new Date(r.month + 'T00:00:00');
+  let data = rawData.filter(r => {
+    const d = new Date((r[dateKey]||'').slice(0,10) + 'T00:00:00');
     return d >= from && d <= to && (plant === 'All' || r.location === plant);
   });
 
@@ -1693,9 +1903,10 @@ async function renderBillings() {
   const totalInvoices = data.reduce((a,r) => a + (+r.invoice_count||0), 0);
   const locations = [...new Set(data.map(r => r.location))];
 
-  // MoM comparison — current month vs prior month
-  const thisMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-1)[0]);
-  const priorMonth = data.filter(r => r.month === data.map(r=>r.month).sort().slice(-2,-1)[0]);
+  // MoM/WoW comparison — most recent period vs prior
+  const periods = [...new Set(data.map(r => (r[dateKey]||'').slice(0,10)))].sort();
+  const thisMonth  = data.filter(r => (r[dateKey]||'').slice(0,10) === periods[periods.length-1]);
+  const priorMonth = data.filter(r => (r[dateKey]||'').slice(0,10) === periods[periods.length-2]);
   const thisMoTotal = thisMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
   const priorMoTotal = priorMonth.reduce((a,r) => a+(+r.billed_amount||0), 0);
   const momChg = thisMoTotal - priorMoTotal;
@@ -1832,7 +2043,7 @@ async function renderCollectionsAnalysis() {
   ].map(k => `<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   // Monthly collections by location
-  const months = [...new Set(data.map(r => r.month))].sort();
+  const months = [...new Set(data.map(r => (r[dateKey]||r.month||'').slice(0,10)))].sort();
   const locs   = [...new Set(data.map(r => r.location))].sort();
   const locColors = { 'Brookville': '#8b2332', 'Kilgore': '#d4a24e', 'Wilkes-Barre': '#4a5568' };
   const mLabels = months.map(m => { const d = new Date(m+'T00:00:00'); return d.toLocaleDateString('en-US',{month:'short',year:'2-digit'}); });
@@ -2047,6 +2258,7 @@ function switchTab(name) {
   if (name === 'billings')             renderBillings();
   if (name === 'collections-analysis') renderCollectionsAnalysis();
   if (name === 'o2c')                  { o2cLoaded = false; renderO2C(); }
+  if (name === 'aging-change')         { renderAgingChange(); }
   if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); }
 }
 document.querySelectorAll('.tab').forEach(t => {
