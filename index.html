@@ -1093,8 +1093,8 @@ function applyAgcRankAndRender() {
     sub.textContent = 'Top 30 customers ' + label + ' · All others grouped';
   }
 
-  renderAgcChart('agcChart60', top30, 'curr_over_60', 'change_over_60', '60+ Days');
-  renderAgcChart('agcChart90', top30, 'curr_over_90', 'change_over_90', '90+ Days');
+  agcRenderChart('agcChart60', top30, 'curr_over_60', 'change_over_60', '60+ Days');
+  agcRenderChart('agcChart90', top30, 'curr_over_90', 'change_over_90', '90+ Days');
   renderAgcTable(top30, othersRow, totalRow);
 }
 
