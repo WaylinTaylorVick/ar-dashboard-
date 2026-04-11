@@ -365,18 +365,23 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <div class="shdr"><div class="stitle">Detail Table</div></div>
     <div style="overflow-x:auto">
       <table>
-        <thead><tr>
-          <th id="agc-th-customer"       onclick="agcSortBy('customer')"       style="cursor:pointer">Customer</th>
-          <th id="agc-th-location"       onclick="agcSortBy('location')"       style="cursor:pointer">Site</th>
-          <th id="agc-th-salesperson"    onclick="agcSortBy('salesperson')"    style="cursor:pointer">Salesperson</th>
-          <th id="agc-th-total_ar"       onclick="agcSortBy('total_ar')"       class="amt" style="cursor:pointer">Total AR</th>
-          <th id="agc-th-curr_over_60"   onclick="agcSortBy('curr_over_60')"   class="amt" style="cursor:pointer;font-weight:700">60+ Now ↓</th>
-          <th id="agc-th-prior_over_60"  onclick="agcSortBy('prior_over_60')"  class="amt" style="cursor:pointer">60+ Prior</th>
-          <th id="agc-th-change_over_60" onclick="agcSortBy('change_over_60')" class="amt" style="cursor:pointer">60+ Change</th>
-          <th id="agc-th-curr_over_90"   onclick="agcSortBy('curr_over_90')"   class="amt" style="cursor:pointer">90+ Now</th>
-          <th id="agc-th-prior_over_90"  onclick="agcSortBy('prior_over_90')"  class="amt" style="cursor:pointer">90+ Prior</th>
-          <th id="agc-th-change_over_90" onclick="agcSortBy('change_over_90')" class="amt" style="cursor:pointer">90+ Change</th>
-        </tr></thead>
+        <thead>
+            <tr>
+              <th rowspan="2" onclick="agcSortBy('customer')"    style="cursor:pointer;vertical-align:bottom">Customer</th>
+              <th rowspan="2" onclick="agcSortBy('location')"    style="cursor:pointer;vertical-align:bottom;font-size:12px">Site</th>
+              <th rowspan="2" onclick="agcSortBy('salesperson')" style="cursor:pointer;vertical-align:bottom;font-size:12px">Salesperson</th>
+              <th rowspan="2" onclick="agcSortBy('total_ar')"    class="amt" style="cursor:pointer;vertical-align:bottom">Total AR</th>
+              <th rowspan="2" id="agc-th-now"                    class="amt" style="cursor:pointer;vertical-align:bottom;font-weight:700">Now ↓</th>
+              <th colspan="5" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
+            </tr>
+            <tr id="agc-month-headers">
+              <th class="amt" id="agc-th-chg0" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
+              <th class="amt" id="agc-th-chg1" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
+              <th class="amt" id="agc-th-chg2" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
+              <th class="amt" id="agc-th-chg3" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
+              <th class="amt" id="agc-th-chg4" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
+            </tr>
+          </thead>
         <tbody id="agc-table-body"></tbody>
       </table>
     </div>
@@ -1020,6 +1025,8 @@ function setAgcView(view) {
     }
   });
   if (charts['agcChart' + view]) charts['agcChart' + view].resize();
+  // Re-render table so change columns switch to match selected dimension
+  applyAgcRankAndRender();
 }
 
 function setAgcRank(mode) {
@@ -1056,35 +1063,28 @@ function applyAgcRankAndRender() {
   const others    = D_aging_change.filter(r => (+r[rankField]||999) > 30);
 
   // All Others aggregated
-  const othersRow = others.length ? {
-    customer:     'All Others',
-    location:     'Multiple',
-    salesperson:  null,
-    rank_by_ar: 31, rank_by_60: 31, rank_by_90: 31,
-    total_ar:     others.reduce((s,r)=>s+(+r.total_ar||0), 0),
-    curr_over_60: others.reduce((s,r)=>s+(+r.curr_over_60||0), 0),
-    curr_over_90: others.reduce((s,r)=>s+(+r.curr_over_90||0), 0),
-    prior_over_60:others.reduce((s,r)=>s+(+r.prior_over_60||0), 0),
-    prior_over_90:others.reduce((s,r)=>s+(+r.prior_over_90||0), 0),
-    change_over_60:others.reduce((s,r)=>s+(+r.change_over_60||0), 0),
-    change_over_90:others.reduce((s,r)=>s+(+r.change_over_90||0), 0),
-  } : null;
+  const sum = (arr, key) => arr.reduce((s, r) => s + (+r[key]||0), 0);
 
-  // Grand TOTAL
-  const all = [...top30, ...(othersRow ? [othersRow] : [])];
-  const totalRow = {
-    customer: 'TOTAL', location: 'All Sites', salesperson: null,
-    rank_by_ar: 99, rank_by_60: 99, rank_by_90: 99,
-    total_ar:     all.reduce((s,r)=>s+(+r.total_ar||0), 0),
-    curr_over_60: all.reduce((s,r)=>s+(+r.curr_over_60||0), 0),
-    curr_over_90: all.reduce((s,r)=>s+(+r.curr_over_90||0), 0),
-    prior_over_60:all.reduce((s,r)=>s+(+r.prior_over_60||0), 0),
-    prior_over_90:all.reduce((s,r)=>s+(+r.prior_over_90||0), 0),
-    change_over_60:all.reduce((s,r)=>s+(+r.change_over_60||0), 0),
-    change_over_90:all.reduce((s,r)=>s+(+r.change_over_90||0), 0),
+  const MONTHLY_FIELDS = ['now_60','now_90','m1_60','m1_90','m2_60','m2_90',
+    'm3_60','m3_90','m4_60','m4_90','m5_60','m5_90',
+    'chg_m0_m1_60','chg_m1_m2_60','chg_m2_m3_60','chg_m3_m4_60','chg_m4_m5_60',
+    'chg_m0_m1_90','chg_m1_m2_90','chg_m2_m3_90','chg_m3_m4_90','chg_m4_m5_90',
+    'curr_over_60','curr_over_90','prior_over_60','prior_over_90',
+    'change_over_60','change_over_90','total_ar'];
+  const sample0 = top30[0] || D_aging_change[0] || {};
+  const aggRow = (label, loc, arr) => {
+    const r = { customer: label, location: loc, salesperson: null,
+                m1_label: sample0.m1_label, m2_label: sample0.m2_label,
+                m3_label: sample0.m3_label, m4_label: sample0.m4_label,
+                m5_label: sample0.m5_label };
+    MONTHLY_FIELDS.forEach(f => r[f] = sum(arr, f));
+    return r;
   };
+  const othersRow = others.length ? aggRow('All Others', 'Multiple', others) : null;
+  const all = [...top30, ...(othersRow ? [othersRow] : [])];
+  const totalRow  = aggRow('TOTAL', 'All Sites', all);
 
-  // Update chart subtitle
+    // Update chart subtitle
   const sub = document.getElementById('agc-chart-sub');
   if (sub) {
     const label = agcRankMode === '60' ? 'ranked by 60+ balance'
@@ -1145,6 +1145,45 @@ function agcSortBy(col) {
 }
 
 function renderAgcTable(dataRows, othersRow, totalRow) {
+  // Determine which aging dimension to show based on the active view toggle
+  const dim = (document.getElementById('agc-view-90')?.style.background || '').includes('accent') ||
+              (document.getElementById('agc-view-90')?.style.background === 'var(--accent)') ? '90' : '60';
+
+  // Column keys for the chosen dimension
+  const nowKey  = 'now_' + dim;
+  const chgKeys = ['chg_m0_m1_'+dim, 'chg_m1_m2_'+dim, 'chg_m2_m3_'+dim, 'chg_m3_m4_'+dim, 'chg_m4_m5_'+dim];
+
+  // Update month headers — use labels from first data row
+  const sample = dataRows[0] || othersRow || {};
+  const mLabels = [sample.m1_label||'M-1', sample.m2_label||'M-2',
+                   sample.m3_label||'M-3', sample.m4_label||'M-4', sample.m5_label||'M-5'];
+  // Pair labels: "Apr→Mar", "Mar→Feb", etc.
+  const chgLabels = [
+    'vs ' + (sample.m1_label||'M-1'),
+    (sample.m1_label||'M-1') + '→' + (sample.m2_label||'M-2'),
+    (sample.m2_label||'M-2') + '→' + (sample.m3_label||'M-3'),
+    (sample.m3_label||'M-3') + '→' + (sample.m4_label||'M-4'),
+    (sample.m4_label||'M-4') + '→' + (sample.m5_label||'M-5'),
+  ];
+  chgLabels.forEach((lbl, i) => {
+    const th = document.getElementById('agc-th-chg' + i);
+    if (th) {
+      const base = lbl + (agcSortCol === chgKeys[i] ? (agcSortDir===-1?' ↓':' ↑') : '');
+      th.textContent = base;
+      th.style.opacity = agcSortCol === chgKeys[i] ? '1' : '0.7';
+      th.onclick = () => agcSortBy(chgKeys[i]);
+    }
+  });
+
+  // Update "Now" header
+  const nowHdr = document.getElementById('agc-th-now_60') || document.getElementById('agc-th-now_90');
+  if (nowHdr) {
+    nowHdr.textContent = dim === '90' ? 'Now 90+' : 'Now 60+';
+    nowHdr.id = 'agc-th-now_' + dim;
+    nowHdr.onclick = () => agcSortBy(nowKey);
+  }
+
+  // Sort
   const sorted = [...dataRows].sort((a, b) => {
     const av = ['customer','location','salesperson'].includes(agcSortCol)
       ? (a[agcSortCol]||'').localeCompare(b[agcSortCol]||'')
@@ -1152,31 +1191,22 @@ function renderAgcTable(dataRows, othersRow, totalRow) {
     return av * agcSortDir;
   });
 
-  const cols = ['customer','location','salesperson','total_ar','curr_over_60','prior_over_60','change_over_60','curr_over_90','prior_over_90','change_over_90'];
-  cols.forEach(c => {
-    const th = document.getElementById('agc-th-' + c);
-    if (!th) return;
-    th.style.opacity = c === agcSortCol ? '1' : '0.7';
-    // Update the visible text to show arrow
-    const base = th.textContent.replace(/ [↑↓]$/, '');
-    th.textContent = base + (c === agcSortCol ? (agcSortDir === -1 ? ' ↓' : ' ↑') : '');
-  });
-
   const chgColor = v => +v > 0 ? 'color:var(--red);font-weight:600' : +v < 0 ? 'color:var(--green);font-weight:600' : '';
-  const chgFmt   = v => +v === 0 ? '—' : (+v > 0 ? '+' : '') + fmtK(+v);
+  const chgFmt   = v => v == null || +v === 0 ? '—' : (+v > 0 ? '+' : '') + fmtK(+v);
 
-  const rowHtml = (r, style) => `<tr style="${style||''}">
-    <td><strong>${r.customer}</strong></td>
-    <td>${r.location||'—'}</td>
-    <td>${r.salesperson||'—'}</td>
-    <td class="amt">${fmtK(+r.total_ar)}</td>
-    <td class="amt">${fmtK(+r.curr_over_60)}</td>
-    <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_60)}</td>
-    <td class="amt" style="${chgColor(r.change_over_60)}">${chgFmt(r.change_over_60)}</td>
-    <td class="amt">${fmtK(+r.curr_over_90)}</td>
-    <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_90)}</td>
-    <td class="amt" style="${chgColor(r.change_over_90)}">${chgFmt(r.change_over_90)}</td>
-  </tr>`;
+  const rowHtml = (r, style) => {
+    const chgCells = chgKeys.map(k =>
+      `<td class="amt" style="font-size:11px;${chgColor(r[k])}">${chgFmt(r[k])}</td>`
+    ).join('');
+    return `<tr style="${style||''}">
+      <td><strong>${r.customer}</strong></td>
+      <td style="font-size:12px">${r.location||'—'}</td>
+      <td style="font-size:12px">${r.salesperson||'—'}</td>
+      <td class="amt">${fmtK(+r.total_ar)}</td>
+      <td class="amt" style="font-weight:600">${fmtK(+r[nowKey]||0)}</td>
+      ${chgCells}
+    </tr>`;
+  };
 
   const rows = sorted.map(r => rowHtml(r, ''));
   if (othersRow) rows.push(rowHtml(othersRow, 'background:var(--bg3);font-style:italic'));
