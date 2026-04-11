@@ -358,10 +358,16 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <div style="overflow-x:auto">
       <table>
         <thead><tr>
-          <th>Customer</th><th>Site</th><th>Salesperson</th>
-          <th class="amt">Total AR</th>
-          <th class="amt">60+ Now</th><th class="amt">60+ Prior</th><th class="amt">60+ Change</th>
-          <th class="amt">90+ Now</th><th class="amt">90+ Prior</th><th class="amt">90+ Change</th>
+          <th id="agc-th-customer"       onclick="agcSortBy('customer')"       style="cursor:pointer">Customer</th>
+          <th id="agc-th-location"       onclick="agcSortBy('location')"       style="cursor:pointer">Site</th>
+          <th id="agc-th-salesperson"    onclick="agcSortBy('salesperson')"    style="cursor:pointer">Salesperson</th>
+          <th id="agc-th-total_ar"       onclick="agcSortBy('total_ar')"       class="amt" style="cursor:pointer">Total AR</th>
+          <th id="agc-th-curr_over_60"   onclick="agcSortBy('curr_over_60')"   class="amt" style="cursor:pointer;font-weight:700">60+ Now ↓</th>
+          <th id="agc-th-prior_over_60"  onclick="agcSortBy('prior_over_60')"  class="amt" style="cursor:pointer">60+ Prior</th>
+          <th id="agc-th-change_over_60" onclick="agcSortBy('change_over_60')" class="amt" style="cursor:pointer">60+ Change</th>
+          <th id="agc-th-curr_over_90"   onclick="agcSortBy('curr_over_90')"   class="amt" style="cursor:pointer">90+ Now</th>
+          <th id="agc-th-prior_over_90"  onclick="agcSortBy('prior_over_90')"  class="amt" style="cursor:pointer">90+ Prior</th>
+          <th id="agc-th-change_over_90" onclick="agcSortBy('change_over_90')" class="amt" style="cursor:pointer">90+ Change</th>
         </tr></thead>
         <tbody id="agc-table-body"></tbody>
       </table>
@@ -1002,33 +1008,31 @@ function setAgcView(view) {
 
 async function renderAgingChange() {
   await loadAgingChange();
-  const data = D_aging_change;
-  if (!data.length) { showEmpty('aging-chg-kpis', 'No aging change data available'); return; }
 
-  // KPIs
-  const totCurr60  = data.reduce((s,r)=>s+(+r.curr_over_60||0),0);
-  const totPrior60 = data.reduce((s,r)=>s+(+r.prior_over_60||0),0);
-  const totCurr90  = data.reduce((s,r)=>s+(+r.curr_over_90||0),0);
-  const totPrior90 = data.reduce((s,r)=>s+(+r.prior_over_90||0),0);
-  const chg60 = totCurr60 - totPrior60;
-  const chg90 = totCurr90 - totPrior90;
+  // Separate TOTAL row, All Others row, and regular rows
+  const totalRow  = (D_aging_change||[]).find(r => r.customer === 'TOTAL');
+  const othersRow = (D_aging_change||[]).find(r => r.customer === 'All Others');
+  const dataRows  = (D_aging_change||[]).filter(r => r.customer !== 'TOTAL' && r.customer !== 'All Others');
 
+  if (!dataRows.length) { showEmpty('aging-chg-kpis', 'No aging change data available'); return; }
+
+  // KPIs from the TOTAL row
+  const t = totalRow || {};
+  const chg60 = +t.change_over_60 || 0;
+  const chg90 = +t.change_over_90 || 0;
   document.getElementById('aging-chg-kpis').innerHTML = [
-    { l: 'Total 60+ Days',   v: fmtK(totCurr60),  s: (chg60>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg60))+' vs 6mo ago', c: chg60>0?'r':'g' },
-    { l: 'Total 90+ Days',   v: fmtK(totCurr90),  s: (chg90>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg90))+' vs 6mo ago', c: chg90>0?'r':'g' },
-    { l: 'Prior 60+ (6mo)',  v: fmtK(totPrior60), s: 'Approx 26 weeks ago', c: 'n' },
-    { l: 'Prior 90+ (6mo)',  v: fmtK(totPrior90), s: 'Approx 26 weeks ago', c: 'n' },
+    { l: 'Total 60+ Days',   v: fmtK(+t.curr_over_60||0),  s: (chg60>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg60))+' vs 6mo ago', c: chg60>0?'r':'g' },
+    { l: 'Total 90+ Days',   v: fmtK(+t.curr_over_90||0),  s: (chg90>=0?'↑ +':'↓ ')+fmtK(Math.abs(chg90))+' vs 6mo ago', c: chg90>0?'r':'g' },
+    { l: 'Prior 60+ (~6mo)', v: fmtK(+t.prior_over_60||0), s: '~26 weeks ago baseline', c: 'n' },
+    { l: 'Prior 90+ (~6mo)', v: fmtK(+t.prior_over_90||0), s: '~26 weeks ago baseline', c: 'n' },
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
-  // Chart helper — horizontal bar showing current vs change
+  // Chart: top 20 by curr_over_60, horizontal bar
   const renderAgcChart = (canvasId, currKey, chgKey, label) => {
-    const top = data.filter(r=>r.customer!=='All Others').slice(0,20);
-    const others = data.find(r=>r.customer==='All Others');
-    const rows = others ? [...top, others] : top;
-
-    const labels   = rows.map(r => r.customer === 'All Others' ? 'All Others' : r.customer);
-    const currVals = rows.map(r => +r[currKey]||0);
-    const chgVals  = rows.map(r => +r[chgKey]||0);
+    const sorted = [...dataRows].sort((a,b) => (+b[currKey]||0) - (+a[currKey]||0)).slice(0, 20);
+    const labels    = sorted.map(r => r.customer.length > 28 ? r.customer.slice(0,26)+'…' : r.customer);
+    const currVals  = sorted.map(r => +r[currKey]||0);
+    const chgVals   = sorted.map(r => +r[chgKey]||0);
     const chgColors = chgVals.map(v => v > 0 ? 'rgba(220,38,38,.7)' : 'rgba(22,163,74,.7)');
 
     if (charts[canvasId]) charts[canvasId].destroy();
@@ -1037,17 +1041,16 @@ async function renderAgingChange() {
       data: {
         labels,
         datasets: [
-          { label: 'Current ' + label, data: currVals, backgroundColor: 'rgba(139,35,50,.55)', borderRadius: 2 },
-          { label: 'Change vs 6mo ago', data: chgVals, backgroundColor: chgColors, borderRadius: 2 },
+          { label: 'Current '    + label, data: currVals, backgroundColor: 'rgba(139,35,50,.55)', borderRadius: 2 },
+          { label: 'Change vs 6mo', data: chgVals, backgroundColor: chgColors, borderRadius: 2 },
         ]
       },
       options: {
-        indexAxis: 'y',
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 12 } }, datalabels: { display: false } },
+        indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font:{size:11}, boxWidth:12 } }, datalabels: {display:false} },
         scales: {
-          x: { ticks: { callback: v => fmtK(v), font: { size: 11 } } },
-          y: { ticks: { font: { size: 11 } } }
+          x: { ticks: { callback: v => fmtK(v), font:{size:11} } },
+          y: { ticks: { font:{size:11} } }
         }
       }
     });
@@ -1056,27 +1059,69 @@ async function renderAgingChange() {
   renderAgcChart('agcChart60', 'curr_over_60', 'change_over_60', '60+ Days');
   renderAgcChart('agcChart90', 'curr_over_90', 'change_over_90', '90+ Days');
 
-  // Table
-  document.getElementById('agc-table-body').innerHTML = data.map(r => {
-    const chg60Color = +r.change_over_60 > 0 ? 'color:var(--red)' : +r.change_over_60 < 0 ? 'color:var(--green)' : '';
-    const chg90Color = +r.change_over_90 > 0 ? 'color:var(--red)' : +r.change_over_90 < 0 ? 'color:var(--green)' : '';
-    const chgFmt = (v) => v === 0 ? '—' : (v > 0 ? '+' : '') + fmtK(v);
-    return `<tr${r.customer==='All Others'?' style="font-weight:600;background:var(--bg3)"':''}>
-      <td><strong>${r.customer}</strong></td>
-      <td>${r.location||'—'}</td>
-      <td>${r.salesperson||'—'}</td>
-      <td class="amt">${fmtK(+r.total_ar)}</td>
-      <td class="amt">${fmtK(+r.curr_over_60)}</td>
-      <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_60)}</td>
-      <td class="amt" style="${chg60Color};font-weight:600">${chgFmt(+r.change_over_60)}</td>
-      <td class="amt">${fmtK(+r.curr_over_90)}</td>
-      <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_90)}</td>
-      <td class="amt" style="${chg90Color};font-weight:600">${chgFmt(+r.change_over_90)}</td>
-    </tr>`;
-  }).join('');
+  // Render table with sortable columns, All Others pinned at bottom, TOTAL at very bottom
+  agcSortCol = agcSortCol || 'curr_over_60';
+  agcSortDir = agcSortDir !== undefined ? agcSortDir : -1;
+  renderAgcTable(dataRows, othersRow, totalRow);
 }
 
-// Daily billings MTD chart
+let agcSortCol = 'curr_over_60';
+let agcSortDir = -1; // -1 = desc, 1 = asc
+
+function agcSortBy(col) {
+  if (agcSortCol === col) { agcSortDir *= -1; }
+  else { agcSortCol = col; agcSortDir = col === 'customer' ? 1 : -1; }
+
+  const totalRow  = (D_aging_change||[]).find(r => r.customer === 'TOTAL');
+  const othersRow = (D_aging_change||[]).find(r => r.customer === 'All Others');
+  const dataRows  = (D_aging_change||[]).filter(r => r.customer !== 'TOTAL' && r.customer !== 'All Others');
+  renderAgcTable(dataRows, othersRow, totalRow);
+}
+
+function renderAgcTable(dataRows, othersRow, totalRow) {
+  // Sort data rows
+  const sorted = [...dataRows].sort((a, b) => {
+    const av = agcSortCol === 'customer' || agcSortCol === 'location' || agcSortCol === 'salesperson'
+      ? (a[agcSortCol]||'').localeCompare(b[agcSortCol]||'')
+      : (+a[agcSortCol]||0) - (+b[agcSortCol]||0);
+    return av * agcSortDir;
+  });
+
+  // Update sort indicators
+  const cols = ['customer','location','salesperson','total_ar','curr_over_60','prior_over_60','change_over_60','curr_over_90','prior_over_90','change_over_90'];
+  cols.forEach(c => {
+    const th = document.getElementById('agc-th-' + c);
+    if (!th) return;
+    const arrow = c === agcSortCol ? (agcSortDir === -1 ? ' ↓' : ' ↑') : '';
+    th.dataset.arrow = arrow;
+    th.style.cursor = 'pointer';
+    th.style.userSelect = 'none';
+    th.style.opacity = c === agcSortCol ? '1' : '0.7';
+  });
+
+  const chgColor = v => +v > 0 ? 'color:var(--red);font-weight:600' : +v < 0 ? 'color:var(--green);font-weight:600' : '';
+  const chgFmt   = v => +v === 0 ? '—' : (+v > 0 ? '+' : '') + fmtK(+v);
+
+  const rowHtml = (r, style) => `<tr style="${style||''}">
+    <td><strong>${r.customer}</strong></td>
+    <td>${r.location||'—'}</td>
+    <td>${r.salesperson||'—'}</td>
+    <td class="amt">${fmtK(+r.total_ar)}</td>
+    <td class="amt">${fmtK(+r.curr_over_60)}</td>
+    <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_60)}</td>
+    <td class="amt" style="${chgColor(r.change_over_60)}">${chgFmt(r.change_over_60)}</td>
+    <td class="amt">${fmtK(+r.curr_over_90)}</td>
+    <td class="amt" style="color:var(--text2)">${fmtK(+r.prior_over_90)}</td>
+    <td class="amt" style="${chgColor(r.change_over_90)}">${chgFmt(r.change_over_90)}</td>
+  </tr>`;
+
+  const rows = sorted.map(r => rowHtml(r, ''));
+  if (othersRow) rows.push(rowHtml(othersRow, 'background:var(--bg3);font-style:italic'));
+  if (totalRow)  rows.push(rowHtml(totalRow,  'background:var(--bg3);font-weight:700;border-top:2px solid var(--border)'));
+
+  document.getElementById('agc-table-body').innerHTML = rows.join('');
+}
+
 async function renderBillingsDailyMTD() {
   if (!D_billings_daily.length) return;
   const plant = document.getElementById('bill-plant')?.value || 'All';
