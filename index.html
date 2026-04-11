@@ -343,11 +343,19 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <div class="shdr" style="justify-content:space-between">
       <div>
         <div class="stitle">Aging Change — Last 6 Months</div>
-        <div class="ssub">Change in 60+ and 90+ day balances vs ~26 weeks ago · Top 30 customers individually, all others grouped</div>
+        <div class="ssub" id="agc-chart-sub">Top 30 customers ranked by Total AR · All others grouped</div>
       </div>
-      <div style="display:flex;gap:4px">
-        <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">60+ Days</button>
-        <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">90+ Days</button>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:3px;align-items:center">
+          <span style="font-size:11px;color:var(--text2);margin-right:2px">Rank by:</span>
+          <button id="agc-rank-ar" onclick="setAgcRank('ar')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">T30 Total AR</button>
+          <button id="agc-rank-60" onclick="setAgcRank('60')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">T30 60+</button>
+          <button id="agc-rank-90" onclick="setAgcRank('90')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">T30 90+</button>
+        </div>
+        <div style="display:flex;gap:3px">
+          <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Show 60+</button>
+          <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Show 90+</button>
+        </div>
       </div>
     </div>
     <div id="agc-chart-60" style="position:relative;height:400px;padding:16px"><canvas id="agcChart60"></canvas></div>
@@ -1006,6 +1014,77 @@ function setAgcView(view) {
   if (charts['agcChart' + view]) charts['agcChart' + view].resize();
 }
 
+function setAgcRank(mode) {
+  agcRankMode = mode;
+  // Update button styles
+  ['ar','60','90'].forEach(m => {
+    const btn = document.getElementById('agc-rank-' + m);
+    if (btn) {
+      btn.style.background = m === mode ? 'var(--accent)' : 'var(--bg3)';
+      btn.style.color      = m === mode ? '#fff' : 'var(--text)';
+    }
+  });
+  // Auto-switch sort column to match rank dimension
+  if (mode === '60') { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
+  if (mode === '90') { agcSortCol = 'curr_over_90'; agcSortDir = -1; }
+  if (mode === 'ar')  { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
+  // Re-render with new grouping
+  applyAgcRankAndRender();
+}
+
+function applyAgcRankAndRender() {
+  if (!D_aging_change.length) return;
+  const rankField = agcRankMode === '60' ? 'rank_by_60'
+                  : agcRankMode === '90' ? 'rank_by_90'
+                  : 'rank_by_ar';
+
+  // Top 30 by selected rank dimension
+  const top30     = D_aging_change.filter(r => (+r[rankField]||999) <= 30);
+  const others    = D_aging_change.filter(r => (+r[rankField]||999) > 30);
+
+  // All Others aggregated
+  const othersRow = others.length ? {
+    customer:     'All Others',
+    location:     'Multiple',
+    salesperson:  null,
+    rank_by_ar: 31, rank_by_60: 31, rank_by_90: 31,
+    total_ar:     others.reduce((s,r)=>s+(+r.total_ar||0), 0),
+    curr_over_60: others.reduce((s,r)=>s+(+r.curr_over_60||0), 0),
+    curr_over_90: others.reduce((s,r)=>s+(+r.curr_over_90||0), 0),
+    prior_over_60:others.reduce((s,r)=>s+(+r.prior_over_60||0), 0),
+    prior_over_90:others.reduce((s,r)=>s+(+r.prior_over_90||0), 0),
+    change_over_60:others.reduce((s,r)=>s+(+r.change_over_60||0), 0),
+    change_over_90:others.reduce((s,r)=>s+(+r.change_over_90||0), 0),
+  } : null;
+
+  // Grand TOTAL
+  const all = [...top30, ...(othersRow ? [othersRow] : [])];
+  const totalRow = {
+    customer: 'TOTAL', location: 'All Sites', salesperson: null,
+    rank_by_ar: 99, rank_by_60: 99, rank_by_90: 99,
+    total_ar:     all.reduce((s,r)=>s+(+r.total_ar||0), 0),
+    curr_over_60: all.reduce((s,r)=>s+(+r.curr_over_60||0), 0),
+    curr_over_90: all.reduce((s,r)=>s+(+r.curr_over_90||0), 0),
+    prior_over_60:all.reduce((s,r)=>s+(+r.prior_over_60||0), 0),
+    prior_over_90:all.reduce((s,r)=>s+(+r.prior_over_90||0), 0),
+    change_over_60:all.reduce((s,r)=>s+(+r.change_over_60||0), 0),
+    change_over_90:all.reduce((s,r)=>s+(+r.change_over_90||0), 0),
+  };
+
+  // Update chart subtitle
+  const sub = document.getElementById('agc-chart-sub');
+  if (sub) {
+    const label = agcRankMode === '60' ? 'ranked by 60+ balance'
+                : agcRankMode === '90' ? 'ranked by 90+ balance'
+                : 'ranked by Total AR';
+    sub.textContent = 'Top 30 customers ' + label + ' · All others grouped';
+  }
+
+  renderAgcChart('agcChart60', top30, 'curr_over_60', 'change_over_60', '60+ Days');
+  renderAgcChart('agcChart90', top30, 'curr_over_90', 'change_over_90', '90+ Days');
+  renderAgcTable(top30, othersRow, totalRow);
+}
+
 async function renderAgingChange() {
   await loadAgingChange();
 
@@ -1028,8 +1107,8 @@ async function renderAgingChange() {
   ].map(k=>`<div class="kpi"><div class="klbl">${k.l}</div><div class="kval">${k.v}</div><div class="ksub ${k.c}">${k.s}</div></div>`).join('');
 
   // Chart: top 20 by curr_over_60, horizontal bar
-  const renderAgcChart = (canvasId, currKey, chgKey, label) => {
-    const sorted = [...dataRows].sort((a,b) => (+b[currKey]||0) - (+a[currKey]||0)).slice(0, 20);
+  const renderAgcChart = (canvasId, rows, currKey, chgKey, label) => {
+    const sorted = [...rows].sort((a,b) => (+b[currKey]||0) - (+a[currKey]||0)).slice(0, 20);
     const labels    = sorted.map(r => r.customer.length > 28 ? r.customer.slice(0,26)+'…' : r.customer);
     const currVals  = sorted.map(r => +r[currKey]||0);
     const chgVals   = sorted.map(r => +r[chgKey]||0);
@@ -1056,26 +1135,21 @@ async function renderAgingChange() {
     });
   };
 
-  renderAgcChart('agcChart60', 'curr_over_60', 'change_over_60', '60+ Days');
-  renderAgcChart('agcChart90', 'curr_over_90', 'change_over_90', '90+ Days');
-
-  // Render table with sortable columns, All Others pinned at bottom, TOTAL at very bottom
+  // Delegate to applyAgcRankAndRender which handles rank toggling
   agcSortCol = agcSortCol || 'curr_over_60';
   agcSortDir = agcSortDir !== undefined ? agcSortDir : -1;
-  renderAgcTable(dataRows, othersRow, totalRow);
+  applyAgcRankAndRender();
 }
 
-let agcSortCol = 'curr_over_60';
+let agcRankMode = 'ar'; // 'ar' | '60' | '90'
+let agcSortCol  = 'curr_over_60';
 let agcSortDir = -1; // -1 = desc, 1 = asc
 
 function agcSortBy(col) {
   if (agcSortCol === col) { agcSortDir *= -1; }
   else { agcSortCol = col; agcSortDir = col === 'customer' ? 1 : -1; }
 
-  const totalRow  = (D_aging_change||[]).find(r => r.customer === 'TOTAL');
-  const othersRow = (D_aging_change||[]).find(r => r.customer === 'All Others');
-  const dataRows  = (D_aging_change||[]).filter(r => r.customer !== 'TOTAL' && r.customer !== 'All Others');
-  renderAgcTable(dataRows, othersRow, totalRow);
+  applyAgcRankAndRender();
 }
 
 function renderAgcTable(dataRows, othersRow, totalRow) {
