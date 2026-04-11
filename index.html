@@ -998,7 +998,15 @@ let D_aging_change = [];
 
 async function loadAgingChange() {
   if (!D_aging_change.length) {
-    D_aging_change = await getAll('v_aging_change_l6m?select=*&order=rank_by_ar.asc');
+    try {
+      D_aging_change = await getAll('v_aging_change_l6m?select=*&order=rank_by_ar.asc');
+      console.log('D_aging_change loaded:', D_aging_change.length, 'rows', D_aging_change[0]);
+    } catch(e) {
+      console.error('loadAgingChange error:', e);
+      const p = document.getElementById('panel-aging-change');
+      if (p) p.insertAdjacentHTML('afterbegin',
+        '<div style="padding:16px;color:var(--red);font-size:12px"><strong>Load error:</strong> ' + e.message + '</div>');
+    }
   }
 }
 
@@ -1033,7 +1041,12 @@ function setAgcRank(mode) {
 }
 
 function applyAgcRankAndRender() {
-  if (!D_aging_change.length) return;
+  console.log('applyAgcRankAndRender: D_aging_change.length =', D_aging_change.length, 'agcRankMode =', agcRankMode);
+  if (!D_aging_change.length) {
+    const kpiEl = document.getElementById('aging-chg-kpis');
+    if (kpiEl) kpiEl.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No data loaded — check console</div>';
+    return;
+  }
   const rankField = agcRankMode === '60' ? 'rank_by_60'
                   : agcRankMode === '90' ? 'rank_by_90'
                   : 'rank_by_ar';
