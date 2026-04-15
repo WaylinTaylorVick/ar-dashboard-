@@ -340,12 +340,17 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 <div class="panel" id="panel-aging-change">
   <div class="krow" id="aging-chg-kpis"></div>
   <div class="sec">
-    <div class="shdr" style="justify-content:space-between">
+    <div class="shdr" style="justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
-        <div class="stitle">Aging Change — Last 6 Months</div>
-        <div class="ssub" id="agc-chart-sub">Top 30 customers ranked by Total AR · All others grouped</div>
+        <div class="stitle" id="agc-detail-title">Detail Table with 60+ AR Changes Month over Month</div>
+        <div class="ssub" id="agc-summary-sub">Top 30 customers ranked by Total AR · All others grouped</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="display:flex;gap:3px;align-items:center">
+          <span style="font-size:11px;color:var(--text2);margin-right:2px">Period:</span>
+          <button id="agc-period-monthly" onclick="setAgcPeriod('monthly')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Monthly</button>
+          <button id="agc-period-weekly" onclick="setAgcPeriod('weekly')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Weekly</button>
+        </div>
         <div style="display:flex;gap:3px;align-items:center">
           <span style="font-size:11px;color:var(--text2);margin-right:2px">Rank by:</span>
           <button id="agc-rank-ar" onclick="setAgcRank('ar')"  style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">T30 Total AR</button>
@@ -358,11 +363,6 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         </div>
       </div>
     </div>
-    <div id="agc-chart-60" style="position:relative;height:400px;padding:16px"><canvas id="agcChart60"></canvas></div>
-    <div id="agc-chart-90" style="position:relative;height:400px;padding:16px;display:none"><canvas id="agcChart90"></canvas></div>
-  </div>
-  <div class="sec" style="margin-top:16px">
-    <div class="shdr"><div class="stitle">Detail Table</div></div>
     <div style="overflow-x:auto">
       <table>
         <thead>
@@ -372,7 +372,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
               <th rowspan="2" onclick="agcSortBy('salesperson')" style="cursor:pointer;vertical-align:bottom;font-size:12px">Salesperson</th>
               <th rowspan="2" onclick="agcSortBy('total_ar')"    class="amt" style="cursor:pointer;vertical-align:bottom">Total AR</th>
               <th rowspan="2" id="agc-th-now"                    class="amt" style="cursor:pointer;vertical-align:bottom;font-weight:700">Now ↓</th>
-              <th colspan="5" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
+              <th colspan="5" id="agc-change-group-label" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
             </tr>
             <tr id="agc-month-headers">
               <th class="amt" id="agc-th-chg0" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
@@ -997,41 +997,129 @@ function clearEmptyCanvas(canvasId) {
 
 
 // ══════════════════════════════════════════════════════════════════
-// AGING CHANGE — L6M
+// AGING CHANGE — L6M / L6W
 // ══════════════════════════════════════════════════════════════════
-let D_aging_change = [];
+let D_aging_change_monthly = [];
+let D_aging_change_weekly  = [];
+let agcPeriodMode = 'monthly';
 
-async function loadAgingChange() {
-  if (!D_aging_change.length) {
-    try {
-      D_aging_change = await getAll('v_aging_change_l6m?select=*&order=rank_by_ar.asc');
-      console.log('D_aging_change loaded:', D_aging_change.length, 'rows', D_aging_change[0]);
-    } catch(e) {
-      console.error('loadAgingChange error:', e);
-      const p = document.getElementById('panel-aging-change');
-      if (p) p.insertAdjacentHTML('afterbegin',
-        '<div style="padding:16px;color:var(--red);font-size:12px"><strong>Load error:</strong> ' + e.message + '</div>');
-    }
+function normalizeAgcRow(row, period) {
+  const r = { ...row, _agc_period: period };
+  if (period === 'weekly') {
+    r.m1_60 = row.m1_60 ?? row.w1_60 ?? 0;
+    r.m1_90 = row.m1_90 ?? row.w1_90 ?? 0;
+    r.m2_60 = row.m2_60 ?? row.w2_60 ?? 0;
+    r.m2_90 = row.m2_90 ?? row.w2_90 ?? 0;
+    r.m3_60 = row.m3_60 ?? row.w3_60 ?? 0;
+    r.m3_90 = row.m3_90 ?? row.w3_90 ?? 0;
+    r.m4_60 = row.m4_60 ?? row.w4_60 ?? 0;
+    r.m4_90 = row.m4_90 ?? row.w4_90 ?? 0;
+    r.m5_60 = row.m5_60 ?? row.w5_60 ?? 0;
+    r.m5_90 = row.m5_90 ?? row.w5_90 ?? 0;
+    r.m1_label = row.m1_label ?? row.w1_label ?? 'W-1';
+    r.m2_label = row.m2_label ?? row.w2_label ?? 'W-2';
+    r.m3_label = row.m3_label ?? row.w3_label ?? 'W-3';
+    r.m4_label = row.m4_label ?? row.w4_label ?? 'W-4';
+    r.m5_label = row.m5_label ?? row.w5_label ?? 'W-5';
+    r.chg_m0_m1_60 = row.chg_m0_m1_60 ?? row.chg_w0_w1_60 ?? 0;
+    r.chg_m1_m2_60 = row.chg_m1_m2_60 ?? row.chg_w1_w2_60 ?? 0;
+    r.chg_m2_m3_60 = row.chg_m2_m3_60 ?? row.chg_w2_w3_60 ?? 0;
+    r.chg_m3_m4_60 = row.chg_m3_m4_60 ?? row.chg_w3_w4_60 ?? 0;
+    r.chg_m4_m5_60 = row.chg_m4_m5_60 ?? row.chg_w4_w5_60 ?? 0;
+    r.chg_m0_m1_90 = row.chg_m0_m1_90 ?? row.chg_w0_w1_90 ?? 0;
+    r.chg_m1_m2_90 = row.chg_m1_m2_90 ?? row.chg_w1_w2_90 ?? 0;
+    r.chg_m2_m3_90 = row.chg_m2_m3_90 ?? row.chg_w2_w3_90 ?? 0;
+    r.chg_m3_m4_90 = row.chg_m3_m4_90 ?? row.chg_w3_w4_90 ?? 0;
+    r.chg_m4_m5_90 = row.chg_m4_m5_90 ?? row.chg_w4_w5_90 ?? 0;
+    r.curr_over_60 = row.curr_over_60 ?? row.now_60 ?? 0;
+    r.curr_over_90 = row.curr_over_90 ?? row.now_90 ?? 0;
+    r.prior_over_60 = row.prior_over_60 ?? row.w5_60 ?? 0;
+    r.prior_over_90 = row.prior_over_90 ?? row.w5_90 ?? 0;
+  } else {
+    r.m1_60 = row.m1_60 ?? 0;
+    r.m1_90 = row.m1_90 ?? 0;
+    r.m2_60 = row.m2_60 ?? 0;
+    r.m2_90 = row.m2_90 ?? 0;
+    r.m3_60 = row.m3_60 ?? 0;
+    r.m3_90 = row.m3_90 ?? 0;
+    r.m4_60 = row.m4_60 ?? 0;
+    r.m4_90 = row.m4_90 ?? 0;
+    r.m5_60 = row.m5_60 ?? 0;
+    r.m5_90 = row.m5_90 ?? 0;
+    r.m1_label = row.m1_label ?? 'M-1';
+    r.m2_label = row.m2_label ?? 'M-2';
+    r.m3_label = row.m3_label ?? 'M-3';
+    r.m4_label = row.m4_label ?? 'M-4';
+    r.m5_label = row.m5_label ?? 'M-5';
+    r.chg_m0_m1_60 = row.chg_m0_m1_60 ?? 0;
+    r.chg_m1_m2_60 = row.chg_m1_m2_60 ?? 0;
+    r.chg_m2_m3_60 = row.chg_m2_m3_60 ?? 0;
+    r.chg_m3_m4_60 = row.chg_m3_m4_60 ?? 0;
+    r.chg_m4_m5_60 = row.chg_m4_m5_60 ?? 0;
+    r.chg_m0_m1_90 = row.chg_m0_m1_90 ?? 0;
+    r.chg_m1_m2_90 = row.chg_m1_m2_90 ?? 0;
+    r.chg_m2_m3_90 = row.chg_m2_m3_90 ?? 0;
+    r.chg_m3_m4_90 = row.chg_m3_m4_90 ?? 0;
+    r.chg_m4_m5_90 = row.chg_m4_m5_90 ?? 0;
+    r.curr_over_60 = row.curr_over_60 ?? row.now_60 ?? 0;
+    r.curr_over_90 = row.curr_over_90 ?? row.now_90 ?? 0;
+    r.prior_over_60 = row.prior_over_60 ?? row.m5_60 ?? 0;
+    r.prior_over_90 = row.prior_over_90 ?? row.m5_90 ?? 0;
   }
+  return r;
+}
+
+function getAgcData() {
+  return agcPeriodMode === 'weekly' ? D_aging_change_weekly : D_aging_change_monthly;
+}
+
+async function loadAgingChange(period = agcPeriodMode) {
+  const isWeekly = period === 'weekly';
+  const store = isWeekly ? D_aging_change_weekly : D_aging_change_monthly;
+  if (store.length) return store;
+
+  const viewName = isWeekly ? 'v_aging_change_l6w' : 'v_aging_change_l6m';
+  try {
+    const rows = await getAll(viewName + '?select=*&order=rank_by_ar.asc');
+    const normalized = rows.map(r => normalizeAgcRow(r, period));
+    if (isWeekly) D_aging_change_weekly = normalized;
+    else D_aging_change_monthly = normalized;
+    console.log('Aging change loaded:', period, normalized.length, 'rows', normalized[0]);
+    return normalized;
+  } catch(e) {
+    console.error('loadAgingChange error:', e);
+    const p = document.getElementById('panel-aging-change');
+    if (p && !p.querySelector('.agc-load-error')) p.insertAdjacentHTML('afterbegin',
+      '<div class="agc-load-error" style="padding:16px;color:var(--red);font-size:12px"><strong>Load error:</strong> ' + e.message + '</div>');
+    return [];
+  }
+}
+
+function setAgcPeriod(period) {
+  agcPeriodMode = period;
+  ['monthly','weekly'].forEach(m => {
+    const btn = document.getElementById('agc-period-' + m);
+    if (btn) {
+      btn.style.background = m === period ? 'var(--accent)' : 'var(--bg3)';
+      btn.style.color      = m === period ? '#fff' : 'var(--text)';
+    }
+  });
+  renderAgingChange();
 }
 
 function setAgcView(view) {
   ['60','90'].forEach(v => {
-    document.getElementById('agc-chart-' + v).style.display = v === view ? '' : 'none';
     const btn = document.getElementById('agc-view-' + v);
     if (btn) {
       btn.style.background = v === view ? 'var(--accent)' : 'var(--bg3)';
       btn.style.color      = v === view ? '#fff' : 'var(--text)';
     }
   });
-  if (charts['agcChart' + view]) charts['agcChart' + view].resize();
-  // Re-render table so change columns switch to match selected dimension
   applyAgcRankAndRender();
 }
 
 function setAgcRank(mode) {
   agcRankMode = mode;
-  // Update button styles
   ['ar','60','90'].forEach(m => {
     const btn = document.getElementById('agc-rank-' + m);
     if (btn) {
@@ -1039,53 +1127,53 @@ function setAgcRank(mode) {
       btn.style.color      = m === mode ? '#fff' : 'var(--text)';
     }
   });
-  // Auto-switch sort column to match rank dimension
   if (mode === '60') { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
   if (mode === '90') { agcSortCol = 'curr_over_90'; agcSortDir = -1; }
-  if (mode === 'ar')  { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
-  // Re-render with new grouping
+  if (mode === 'ar') { agcSortCol = 'curr_over_60'; agcSortDir = -1; }
   applyAgcRankAndRender();
 }
 
 function applyAgcRankAndRender() {
-  console.log('applyAgcRankAndRender: D_aging_change.length =', D_aging_change.length, 'agcRankMode =', agcRankMode);
-  if (!D_aging_change.length) {
+  const data = getAgcData();
+  console.log('applyAgcRankAndRender:', agcPeriodMode, 'rows =', data.length, 'agcRankMode =', agcRankMode);
+  if (!data.length) {
     const kpiEl = document.getElementById('aging-chg-kpis');
     if (kpiEl) kpiEl.innerHTML = '<div style="padding:16px;color:var(--text2);font-size:12px">No data loaded — check console</div>';
+    const tbody = document.getElementById('agc-table-body');
+    if (tbody) tbody.innerHTML = '';
     return;
   }
+
   const rankField = agcRankMode === '60' ? 'rank_by_60'
                   : agcRankMode === '90' ? 'rank_by_90'
                   : 'rank_by_ar';
 
-  // Top 30 by selected rank dimension
-  const top30     = D_aging_change.filter(r => (+r[rankField]||999) <= 30);
-  const others    = D_aging_change.filter(r => (+r[rankField]||999) > 30);
+  const top30  = data.filter(r => (+r[rankField] || 999) <= 30);
+  const others = data.filter(r => (+r[rankField] || 999) > 30);
 
-  // All Others aggregated
-  const sum = (arr, key) => arr.reduce((s, r) => s + (+r[key]||0), 0);
-
-  const MONTHLY_FIELDS = ['now_60','now_90','m1_60','m1_90','m2_60','m2_90',
+  const sum = (arr, key) => arr.reduce((s, r) => s + (+r[key] || 0), 0);
+  const ROLLUP_FIELDS = ['now_60','now_90','m1_60','m1_90','m2_60','m2_90',
     'm3_60','m3_90','m4_60','m4_90','m5_60','m5_90',
     'chg_m0_m1_60','chg_m1_m2_60','chg_m2_m3_60','chg_m3_m4_60','chg_m4_m5_60',
     'chg_m0_m1_90','chg_m1_m2_90','chg_m2_m3_90','chg_m3_m4_90','chg_m4_m5_90',
     'curr_over_60','curr_over_90','prior_over_60','prior_over_90',
     'change_over_60','change_over_90','total_ar'];
-  const sample0 = top30[0] || D_aging_change[0] || {};
+
+  const sample0 = top30[0] || data[0] || {};
   const aggRow = (label, loc, arr) => {
-    const r = { customer: label, location: loc, salesperson: null,
+    const r = { customer: label, location: loc, salesperson: null, _agc_period: agcPeriodMode,
                 m1_label: sample0.m1_label, m2_label: sample0.m2_label,
                 m3_label: sample0.m3_label, m4_label: sample0.m4_label,
                 m5_label: sample0.m5_label };
-    MONTHLY_FIELDS.forEach(f => r[f] = sum(arr, f));
+    ROLLUP_FIELDS.forEach(f => r[f] = sum(arr, f));
     return r;
   };
+
   const othersRow = others.length ? aggRow('All Others', 'Multiple', others) : null;
   const all = [...top30, ...(othersRow ? [othersRow] : [])];
-  const totalRow  = aggRow('TOTAL', 'All Sites', all);
+  const totalRow = aggRow('TOTAL', 'All Sites', all);
 
-    // Update chart subtitle
-  const sub = document.getElementById('agc-chart-sub');
+  const sub = document.getElementById('agc-summary-sub');
   if (sub) {
     const label = agcRankMode === '60' ? 'ranked by 60+ balance'
                 : agcRankMode === '90' ? 'ranked by 90+ balance'
@@ -1093,18 +1181,16 @@ function applyAgcRankAndRender() {
     sub.textContent = 'Top 30 customers ' + label + ' · All others grouped';
   }
 
-  agcRenderChart('agcChart60', top30, 'curr_over_60', 'change_over_60', '60+ Days');
-  agcRenderChart('agcChart90', top30, 'curr_over_90', 'change_over_90', '90+ Days');
   renderAgcTable(top30, othersRow, totalRow);
 }
 
 async function renderAgingChange() {
-  await loadAgingChange();
-  if (!D_aging_change.length) {
+  await loadAgingChange(agcPeriodMode);
+  const data = getAgcData();
+  if (!data.length) {
     showEmpty('aging-chg-kpis', 'No aging change data available');
     return;
   }
-  // On first render, set defaults and delegate to applyAgcRankAndRender
   agcSortCol = agcSortCol || 'curr_over_60';
   agcSortDir = agcSortDir !== undefined ? agcSortDir : -1;
   applyAgcRankAndRender();
@@ -1114,30 +1200,6 @@ let agcRankMode = 'ar'; // 'ar' | '60' | '90'
 let agcSortCol  = 'curr_over_60';
 let agcSortDir  = -1;
 
-
-function agcRenderChart(canvasId, rows, currKey, chgKey, label) {
-  const sorted    = [...rows].sort((a,b) => (+b[currKey]||0) - (+a[currKey]||0)).slice(0, 20);
-  const labels    = sorted.map(r => r.customer.length > 28 ? r.customer.slice(0,26)+'…' : r.customer);
-  const currVals  = sorted.map(r => +r[currKey]||0);
-  const chgVals   = sorted.map(r => +r[chgKey]||0);
-  const chgColors = chgVals.map(v => v > 0 ? 'rgba(220,38,38,.7)' : 'rgba(22,163,74,.7)');
-  if (charts[canvasId]) charts[canvasId].destroy();
-  charts[canvasId] = new Chart(document.getElementById(canvasId), {
-    type: 'bar',
-    data: { labels, datasets: [
-      { label: 'Current ' + label, data: currVals, backgroundColor: 'rgba(139,35,50,.55)', borderRadius: 2 },
-      { label: 'Change vs 6mo',    data: chgVals,  backgroundColor: chgColors, borderRadius: 2 },
-    ]},
-    options: {
-      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position:'bottom', labels:{font:{size:11},boxWidth:12} }, datalabels:{display:false} },
-      scales: { x:{ticks:{callback:v=>fmtK(v),font:{size:11}}}, y:{ticks:{font:{size:11}}} }
-    }
-  });
-}
-
-
-
 function agcSortBy(col) {
   if (agcSortCol === col) agcSortDir *= -1;
   else { agcSortCol = col; agcSortDir = col === 'customer' ? 1 : -1; }
@@ -1145,49 +1207,52 @@ function agcSortBy(col) {
 }
 
 function renderAgcTable(dataRows, othersRow, totalRow) {
-  // Determine which aging dimension to show based on the active view toggle
   const dim = (document.getElementById('agc-view-90')?.style.background || '').includes('accent') ||
               (document.getElementById('agc-view-90')?.style.background === 'var(--accent)') ? '90' : '60';
 
-  // Column keys for the chosen dimension
   const nowKey  = 'now_' + dim;
   const chgKeys = ['chg_m0_m1_'+dim, 'chg_m1_m2_'+dim, 'chg_m2_m3_'+dim, 'chg_m3_m4_'+dim, 'chg_m4_m5_'+dim];
 
-  // Update month headers — use labels from first data row
-  const sample = dataRows[0] || othersRow || {};
-  const mLabels = [sample.m1_label||'M-1', sample.m2_label||'M-2',
-                   sample.m3_label||'M-3', sample.m4_label||'M-4', sample.m5_label||'M-5'];
-  // Pair labels: "Apr→Mar", "Mar→Feb", etc.
+  const sample = dataRows[0] || othersRow || totalRow || {};
+  const periodWord = agcPeriodMode === 'weekly' ? 'Week' : 'Month';
+  const changeHdr = document.getElementById('agc-change-group-label');
+  if (changeHdr) changeHdr.textContent = '← ' + periodWord + 'ly Change';
+
   const chgLabels = [
-    'vs ' + (sample.m1_label||'M-1'),
-    (sample.m1_label||'M-1') + '→' + (sample.m2_label||'M-2'),
-    (sample.m2_label||'M-2') + '→' + (sample.m3_label||'M-3'),
-    (sample.m3_label||'M-3') + '→' + (sample.m4_label||'M-4'),
-    (sample.m4_label||'M-4') + '→' + (sample.m5_label||'M-5'),
+    'vs ' + (sample.m1_label || (agcPeriodMode === 'weekly' ? 'W-1' : 'M-1')),
+    (sample.m1_label || (agcPeriodMode === 'weekly' ? 'W-1' : 'M-1')) + '→' + (sample.m2_label || (agcPeriodMode === 'weekly' ? 'W-2' : 'M-2')),
+    (sample.m2_label || (agcPeriodMode === 'weekly' ? 'W-2' : 'M-2')) + '→' + (sample.m3_label || (agcPeriodMode === 'weekly' ? 'W-3' : 'M-3')),
+    (sample.m3_label || (agcPeriodMode === 'weekly' ? 'W-3' : 'M-3')) + '→' + (sample.m4_label || (agcPeriodMode === 'weekly' ? 'W-4' : 'M-4')),
+    (sample.m4_label || (agcPeriodMode === 'weekly' ? 'W-4' : 'M-4')) + '→' + (sample.m5_label || (agcPeriodMode === 'weekly' ? 'W-5' : 'M-5')),
   ];
+
   chgLabels.forEach((lbl, i) => {
     const th = document.getElementById('agc-th-chg' + i);
     if (th) {
-      const base = lbl + (agcSortCol === chgKeys[i] ? (agcSortDir===-1?' ↓':' ↑') : '');
+      const base = lbl + (agcSortCol === chgKeys[i] ? (agcSortDir===-1 ? ' ↓' : ' ↑') : '');
       th.textContent = base;
       th.style.opacity = agcSortCol === chgKeys[i] ? '1' : '0.7';
       th.onclick = () => agcSortBy(chgKeys[i]);
     }
   });
 
-  // Update "Now" header
-  const nowHdr = document.getElementById('agc-th-now_60') || document.getElementById('agc-th-now_90');
+  const detailTitle = document.getElementById('agc-detail-title');
+  if (detailTitle) {
+    detailTitle.textContent = 'Detail Table with ' + (dim === '90' ? '90+ AR' : '60+ AR') + ' Changes ' +
+      (agcPeriodMode === 'weekly' ? 'Week over Week' : 'Month over Month');
+  }
+
+  const nowHdr = document.getElementById('agc-th-now') || document.getElementById('agc-th-now_60') || document.getElementById('agc-th-now_90');
   if (nowHdr) {
-    nowHdr.textContent = dim === '90' ? 'Now 90+' : 'Now 60+';
-    nowHdr.id = 'agc-th-now_' + dim;
+    nowHdr.textContent = dim === '90' ? '90+ AR' : '60+ AR';
+    nowHdr.id = 'agc-th-now';
     nowHdr.onclick = () => agcSortBy(nowKey);
   }
 
-  // Sort
   const sorted = [...dataRows].sort((a, b) => {
     const av = ['customer','location','salesperson'].includes(agcSortCol)
-      ? (a[agcSortCol]||'').localeCompare(b[agcSortCol]||'')
-      : (+a[agcSortCol]||0) - (+b[agcSortCol]||0);
+      ? (a[agcSortCol] || '').localeCompare(b[agcSortCol] || '')
+      : (+a[agcSortCol] || 0) - (+b[agcSortCol] || 0);
     return av * agcSortDir;
   });
 
@@ -1210,10 +1275,9 @@ function renderAgcTable(dataRows, othersRow, totalRow) {
 
   const rows = sorted.map(r => rowHtml(r, ''));
   if (othersRow) rows.push(rowHtml(othersRow, 'background:var(--bg3);font-style:italic'));
-  if (totalRow)  rows.push(rowHtml(totalRow,  'background:var(--bg3);font-weight:700;border-top:2px solid var(--border)'));
+  if (totalRow)  rows.push(rowHtml(totalRow, 'background:var(--bg3);font-weight:700;border-top:2px solid var(--border)'));
   document.getElementById('agc-table-body').innerHTML = rows.join('');
 }
-
 
 async function renderBillingsDailyMTD() {
   if (!D_billings_daily.length) return;
