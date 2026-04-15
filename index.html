@@ -147,6 +147,50 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 .user-badge{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text2)}
 .signout-btn{font-size:11px;padding:4px 10px;border:1px solid var(--border);border-radius:4px;background:var(--bg2);cursor:pointer;color:var(--text2)}
 .signout-btn:hover{background:var(--bg3)}
+
+/* ── Notes Drawer ─────────────────────────────────────────────── */
+#notes-drawer {
+  position:fixed; top:0; right:-420px; width:400px; height:100vh;
+  background:var(--bg2); border-left:1px solid var(--border);
+  box-shadow:-4px 0 24px rgba(0,0,0,.15);
+  z-index:1000; transition:right .25s ease; display:flex; flex-direction:column;
+}
+#notes-drawer.open { right:0; }
+#notes-drawer-backdrop {
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.25); z-index:999;
+}
+#notes-drawer-backdrop.open { display:block; }
+.nd-hdr { display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.nd-title { font-size:13px; font-weight:700; color:var(--text); }
+.nd-sub   { font-size:11px; color:var(--text2); margin-top:2px; }
+.nd-close { background:none; border:none; font-size:18px; cursor:pointer;
+  color:var(--text2); padding:0 4px; line-height:1; }
+.nd-close:hover { color:var(--text); }
+.nd-list  { flex:1; overflow-y:auto; padding:12px 16px; }
+.nd-note  { padding:10px 12px; border-radius:6px; border:1px solid var(--border);
+  background:var(--bg3); margin-bottom:8px; }
+.nd-note.pinned   { border-left:3px solid var(--accent); }
+.nd-note.resolved { opacity:.55; }
+.nd-meta  { font-size:10px; color:var(--text2); margin-bottom:4px; }
+.nd-body  { font-size:12px; color:var(--text); line-height:1.5; }
+.nd-empty { text-align:center; padding:32px 0; color:var(--text2); font-size:12px; }
+.nd-compose { padding:12px 16px; border-top:1px solid var(--border); flex-shrink:0; }
+.nd-compose textarea { width:100%; box-sizing:border-box; font-size:12px; padding:8px 10px;
+  border:1px solid var(--border); border-radius:4px; resize:vertical; min-height:60px;
+  background:var(--bg); color:var(--text); font-family:inherit; }
+.nd-compose-row { display:flex; gap:6px; margin-top:6px; }
+.nd-compose-row button { flex:1; padding:6px 0; font-size:12px; border-radius:4px;
+  cursor:pointer; border:1px solid var(--border); }
+.nd-btn-save { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+.nd-badge { display:inline-flex; align-items:center; gap:3px; padding:2px 7px;
+  border-radius:10px; font-size:10px; font-weight:600; cursor:pointer;
+  border:1px solid var(--border); background:var(--bg3); color:var(--text2); transition:background .15s; }
+.nd-badge:hover  { background:var(--accent); color:#fff; border-color:var(--accent); }
+.nd-badge.has-notes { background:rgba(139,35,50,.12); color:var(--accent); border-color:var(--accent); }
+.agc-notes-col { display:none; }
+.agc-notes-visible .agc-notes-col { display:table-cell; }
+
 </style>
 </head>
 <body>
@@ -360,6 +404,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         <div style="display:flex;gap:3px">
           <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Show 60+</button>
           <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Show 90+</button>
+          <button id="agc-notes-toggle" onclick="toggleAgcNotes()" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text);margin-left:4px">&#128203; Notes</button>
         </div>
       </div>
     </div>
@@ -373,6 +418,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
               <th rowspan="2" onclick="agcSortBy('total_ar')"    class="amt" style="cursor:pointer;vertical-align:bottom">Total AR</th>
               <th rowspan="2" id="agc-th-now"                    class="amt" style="cursor:pointer;vertical-align:bottom;font-weight:700">Now ↓</th>
               <th colspan="5" id="agc-change-group-label" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
+              <th rowspan="2" class="agc-notes-col" style="vertical-align:bottom;font-size:11px;text-align:center">Notes</th>
             </tr>
             <tr id="agc-month-headers">
               <th class="amt" id="agc-th-chg0" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
@@ -1270,6 +1316,9 @@ function renderAgcTable(dataRows, othersRow, totalRow) {
       <td class="amt">${fmtK(+r.total_ar)}</td>
       <td class="amt" style="font-weight:600">${fmtK(+r[nowKey]||0)}</td>
       ${chgCells}
+      <td class="agc-notes-col" onclick="event.stopPropagation()">${
+        (r.customer==='All Others'||r.customer==='TOTAL') ? '&mdash;' : noteBadgeHtml(r.customer)
+      }</td>
     </tr>`;
   };
 
@@ -1353,6 +1402,94 @@ function toggleTheme() {
   applyTheme(saved === 'dark' || (!saved && prefersDark));
 })();
 
+
+// Helper: escape single quotes for use in inline onclick attrs
+function escCust(s) { return (s||'').split("'").join("\\'"); }
+
+
+// ── Notes Drawer ──────────────────────────────────────────────────
+let _ndCustomer = '';
+function openNotesDrawer(customer) {
+  _ndCustomer = customer;
+  document.getElementById('nd-cust-name').textContent = customer;
+  renderNotesDrawer();
+  document.getElementById('notes-drawer').classList.add('open');
+  document.getElementById('notes-drawer-backdrop').classList.add('open');
+  document.getElementById('nd-body').value = '';
+}
+function closeNotesDrawer() {
+  document.getElementById('notes-drawer').classList.remove('open');
+  document.getElementById('notes-drawer-backdrop').classList.remove('open');
+}
+function renderNotesDrawer() {
+  const notes = (D_notes||[]).filter(n =>
+    (n.ref_id||'').toLowerCase().includes(_ndCustomer.toLowerCase())
+  ).sort((a,b) => {
+    if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
+    return new Date(b.created_at) - new Date(a.created_at);
+  });
+  document.getElementById('nd-note-count').textContent =
+    notes.length === 0 ? 'No notes yet' : notes.length + ' note' + (notes.length>1?'s':'');
+  if (!notes.length) {
+    document.getElementById('nd-list').innerHTML =
+      '<div class="nd-empty">&#128203;<br>No notes for this customer.<br>Add one below.</div>';
+    return;
+  }
+  document.getElementById('nd-list').innerHTML = notes.map(n => {
+    const d = n.created_at ? new Date(n.created_at).toLocaleDateString('en-US',
+      {month:'short',day:'numeric',year:'numeric'}) : '';
+    const tag = n.note_type ? '<span style="background:var(--bg2);border:1px solid var(--border);border-radius:3px;padding:1px 5px;font-size:9px;text-transform:uppercase">'+n.note_type+'</span>' : '';
+    const pin = n.is_pinned ? '&#128204; ' : '';
+    const res = n.is_resolved ? '<span style="font-size:9px;color:var(--green);margin-left:4px">&#10003; Resolved</span>' : '';
+    const body = (n.body||'').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+    return '<div class="nd-note'+(n.is_pinned?' pinned':'')+(n.is_resolved?' resolved':'')+'">'+
+      '<div class="nd-meta">'+pin+d+' &middot; '+(n.author||'Unknown')+' '+tag+res+'</div>'+
+      '<div class="nd-body">'+body+'</div></div>';
+  }).join('');
+}
+async function ndSave() {
+  const body = document.getElementById('nd-body').value.trim();
+  if (!body) return;
+  const type = document.getElementById('nd-type').value;
+  const author = localStorage.getItem('ar_author') || 'Anonymous';
+  try {
+    const r = await post('ar_notes', { body, author,
+      ref_id: _ndCustomer, ref_label: _ndCustomer,
+      note_type: type.toLowerCase(), is_pinned: false, is_resolved: false });
+    const data = await r.json();
+    if (data && data[0]) {
+      D_notes.unshift(data[0]);
+      document.getElementById('nd-body').value = '';
+      renderNotesDrawer();
+      refreshNoteBadges();
+    }
+  } catch(e) { alert('Error saving note: ' + e.message); }
+}
+function noteBadgeHtml(customer) {
+  const n = (D_notes||[]).filter(x => (x.ref_id||'').toLowerCase().includes(customer.toLowerCase())).length;
+  const cls = 'nd-badge' + (n > 0 ? ' has-notes' : '');
+  const lbl = n > 0 ? '&#128203; ' + n : '&#128203;';
+  const ttl = n > 0 ? n + ' note' + (n>1?'s':'') : 'Add note';
+  return '<span class="'+cls+'" data-nd-customer="'+customer+'" onclick="openNotesDrawer(this.dataset.ndCustomer)" title="'+ttl+'">'+lbl+'</span>';
+}
+function refreshNoteBadges() {
+  document.querySelectorAll('[data-nd-customer]').forEach(el => {
+    const cust = el.dataset.ndCustomer;
+    const n = (D_notes||[]).filter(x => (x.ref_id||'').toLowerCase().includes(cust.toLowerCase())).length;
+    el.className = 'nd-badge' + (n > 0 ? ' has-notes' : '');
+    el.innerHTML = n > 0 ? '&#128203; ' + n : '&#128203;';
+    el.title = n > 0 ? n + ' note' + (n>1?'s':'') : 'Add note';
+  });
+}
+function toggleAgcNotes() {
+  const table = document.querySelector('#panel-aging-change table');
+  const btn   = document.getElementById('agc-notes-toggle');
+  if (!table || !btn) return;
+  const on = table.classList.toggle('agc-notes-visible');
+  btn.style.background = on ? 'var(--accent)' : 'var(--bg3)';
+  btn.style.color      = on ? '#fff' : 'var(--text)';
+}
+
 async function loadAll() {
   document.getElementById('loader').style.display = 'flex';
   try {
@@ -1377,7 +1514,7 @@ async function loadAll() {
     }
 
     ld('Loading invoice detail…');
-    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,consolidated_salesperson&order=days_past_due.desc&limit=10000');
+    D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,salesperson&order=days_past_due.desc&limit=10000');
 
     ld('Loading notes…');
     D_notes = await get('ar_notes?select=*&order=created_at.desc');
@@ -1722,7 +1859,7 @@ function filterColl() {
     const pb   = (window.pbMap || {})[c.customer] || {};
     const dtp   = +pb.avg_dtp || +c.avg_days_to_pay || 0;
     const trend = pb.trend || '';
-    return `<tr class="${pcls}" style="cursor:pointer" onclick="drillCust('${c.customer.replace(/'/g, "\\'")}')">
+    return `<tr class="${pcls}" style="cursor:pointer" onclick="drillCust('${escCust(c.customer)}')" >
       <td>${sBadge(c.s, c.tier)}</td>
       <td>${sBadge(c.tier, c.tier)}</td>
       <td><span class="bdg ${aStyle}">${c.action}</span></td>
@@ -1736,7 +1873,7 @@ function filterColl() {
       <td class="amt">${dtp > 0 ? Math.round(dtp) + 'd' : '\u2014'}</td>
       <td>${trend ? `<span style="font-size:11px;color:${trend==='deteriorating'?'var(--red)':trend==='improving'?'var(--green)':'var(--text2)'}">${trend==='deteriorating'?'↓ Worsening':trend==='improving'?'↑ Improving':'— Stable'}</span>` : '\u2014'}</td>
       <td>${riskHtml || '\u2014'}</td>
-      <td><button class="nbtn" onclick="event.stopPropagation();quickNote('${c.customer.replace(/'/g, "\\'")}')">+ Note${nCnt > 0 ? ' (' + nCnt + ')' : ''}</button></td>
+      <td onclick="event.stopPropagation()">${noteBadgeHtml(c.customer)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="13" style="text-align:center;padding:20px;color:var(--text2)">No customers match current filters</td></tr>';
 }
@@ -1847,7 +1984,7 @@ function filterCust() {
       <td class="amt" style="${+c.bucket_90_plus > 0 ? 'color:var(--red);font-weight:700' : ''}">${fmt(+c.bucket_90_plus)}</td>
       <td class="amt" style="${+c.past_due > 0 ? 'color:var(--amber)' : ''}">${fmt(+c.past_due)}</td>
       <td class="amt">${dtp > 0 ? Math.round(dtp) + 'd' : '\u2014'}</td>
-      <td><button class="nbtn" onclick="quickNote('${c.customer.replace(/'/g, "\\'")}')">+ Note${noteCount(c.customer) > 0 ? ' (' + noteCount(c.customer) + ')' : ''}</button></td>
+      <td>${noteBadgeHtml(c.customer)}</td>
     </tr>`;
   }).join('');
 
@@ -3427,5 +3564,27 @@ function exportForecastExcel() {
 }
 
 </script>
+
+<div id="notes-drawer-backdrop" onclick="closeNotesDrawer()"></div>
+<div id="notes-drawer">
+  <div class="nd-hdr">
+    <div>
+      <div class="nd-title" id="nd-cust-name">Customer Notes</div>
+      <div class="nd-sub"  id="nd-note-count"></div>
+    </div>
+    <button class="nd-close" onclick="closeNotesDrawer()">&#10005;</button>
+  </div>
+  <div class="nd-list" id="nd-list"></div>
+  <div class="nd-compose">
+    <textarea id="nd-body" placeholder="Add a note&#8230;"></textarea>
+    <div class="nd-compose-row">
+      <select id="nd-type" style="font-size:12px;padding:4px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+        <option>General</option><option>Collections</option>
+        <option>Dispute</option><option>Escalation</option>
+      </select>
+      <button class="nd-btn-save" onclick="ndSave()">Save Note</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
