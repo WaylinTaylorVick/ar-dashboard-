@@ -27,13 +27,8 @@ When Claude produces a new `apex_ar_live.html` file, deploy it like this:
 Open VS Code terminal (`Ctrl + backtick`) and run:
 
 ```powershell
-# 1. Copy the new file into the dashboard folder (rename it to index.html)
 copy "C:\Users\taylo\Downloads\apex_ar_live.html" "C:\Users\taylo\dashboard\index.html"
-
-# 2. Navigate to the dashboard folder
 cd C:\Users\taylo\dashboard
-
-# 3. Stage, commit, and push
 git add index.html
 git commit -m "Update dashboard"
 git push
