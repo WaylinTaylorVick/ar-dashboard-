@@ -179,6 +179,23 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 .flag-hold { display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:rgba(220,38,38,.15);color:var(--red);border:1px solid rgba(220,38,38,.4);margin-right:3px; }
 .flag-lien { display:inline-block;padding:1px 6px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;background:rgba(217,119,6,.15);color:var(--amber);border:1px solid rgba(217,119,6,.4);margin-right:3px; }
 
+
+/* ── Drill overlay ────────────────────────────────────────────── */
+#drillsec {
+  position:fixed; bottom:0; left:0; right:0;
+  max-height:55vh; overflow-y:auto;
+  background:var(--bg2); border-top:2px solid var(--accent);
+  box-shadow:0 -4px 24px rgba(0,0,0,.2);
+  z-index:500; padding:0 24px 16px;
+  transform:translateY(100%); transition:transform .25s ease;
+}
+#drillsec.open { transform:translateY(0); }
+#drill-backdrop {
+  display:none; position:fixed; inset:0;
+  background:rgba(0,0,0,.15); z-index:499;
+}
+#drill-backdrop.open { display:block; }
+
 </style>
 </head>
 <body>
@@ -388,23 +405,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     </div>
   </div>
   <!-- Drill-down -->
-  <div class="sec hidden" id="drillsec">
-    <div class="shdr">
-      <div><div class="stitle" id="drilltitle">Invoice Detail</div><div class="ssub" id="drillsub"></div></div>
-      <button class="nbtn" style="padding:6px 14px" onclick="closeDrill()">Close &#x2715;</button>
-    </div>
-    <div class="scards" id="drillcards"></div>
-    <div id="custTrendWrap" class="hidden" style="border-top:1px solid var(--border);margin:4px 0">
-      <div class="shdr"><div class="stitle" style="font-size:13px">13-Week AR Trend for this Customer</div></div>
-      <div style="position:relative;height:220px;padding:12px"><canvas id="custTrendChart"></canvas></div>
-    </div>
-    <div style="overflow-x:auto">
-      <table><thead><tr>
-        <th>Invoice #</th><th>Plant</th><th>Invoice Date</th><th>Due Date</th>
-        <th class="amt">Balance</th><th class="amt">Days Past Due</th><th>Bucket</th><th>Note</th>
-      </tr></thead><tbody id="drillbody"></tbody></table>
-    </div>
-  </div>
+  
 </div>
 
 <!-- ══════════════ AGING CHANGE ══════════════ -->
@@ -457,6 +458,8 @@ tr.trow:hover td{background:var(--accent);color:#fff}
               <th rowspan="2" onclick="agcSortBy('total_ar')"    class="amt" style="cursor:pointer;vertical-align:bottom">Total AR</th>
               <th rowspan="2" id="agc-th-now"                    class="amt" style="cursor:pointer;vertical-align:bottom;font-weight:700">Now ↓</th>
               <th colspan="5" id="agc-change-group-label" class="amt" style="text-align:center;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)">← Monthly Change</th>
+              <th rowspan="2" style="white-space:nowrap;vertical-align:bottom">Hold / Lien</th>
+              <th rowspan="2" style="vertical-align:bottom">Note</th>
             </tr>
             <tr id="agc-month-headers">
               <th class="amt" id="agc-th-chg0" style="cursor:pointer;font-size:10px;white-space:nowrap"></th>
@@ -502,6 +505,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
           <th data-k="bucket_90_plus" class="amt">90+</th>
           <th data-k="past_due" class="amt">Past Due</th>
           <th data-k="avg_days_to_pay" class="amt">Avg DTP</th>
+          <th style="white-space:nowrap">Hold / Lien</th>
           <th>Note</th>
         </tr></thead>
         <tbody id="custbody"></tbody>
@@ -1346,13 +1350,16 @@ function renderAgcTable(dataRows, othersRow, totalRow) {
     const chgCells = chgKeys.map(k =>
       `<td class="amt" style="font-size:11px;${chgColor(r[k])}">${chgFmt(r[k])}</td>`
     ).join('');
-    return `<tr style="${style||''}">
-      <td><strong>${r.customer}</strong></td>
+    const agcStyle = (style||'') + ';cursor:pointer';
+    return `<tr style="${agcStyle}" onclick="drillCust('${(r.customer||'').replace(/'/g,"\\'")}')">
+      <td><strong>${r.customer}</strong>${customerFlagBadges(r.customer)}</td>
       <td style="font-size:12px">${r.location||'—'}</td>
       <td style="font-size:12px">${r.salesperson||'—'}</td>
       <td class="amt">${fmtK(+r.total_ar)}</td>
       <td class="amt" style="font-weight:600">${fmtK(+r[nowKey]||0)}</td>
       ${chgCells}
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">${flagCellHtml(r.customer)}</td>
+      <td onclick="event.stopPropagation()">${noteBadgeHtml(r.customer)}</td>
     </tr>`;
   };
 
@@ -1457,10 +1464,11 @@ function closeNotesDrawer() {
   document.getElementById('notes-drawer-backdrop').classList.remove('open');
 }
 function renderNotesDrawer() {
-  const notes = (D_notes||[]).filter(n =>
-    _ndInvoiceId ? n.invoice_id === _ndInvoiceId
-                 : (n.ref_id||'').toLowerCase().includes(_ndCustomer.toLowerCase())
-  ).sort((a,b) => {
+  const notes = (D_notes||[]).filter(n => {
+    if (_ndInvoiceId) return n.invoice_id === _ndInvoiceId;
+    // Customer level: include direct customer notes AND invoice-level notes for their invoices
+    return custNotes(_ndCustomer).includes(n);
+  }).sort((a,b) => {
     if (a.is_pinned !== b.is_pinned) return a.is_pinned ? -1 : 1;
     return new Date(b.created_at) - new Date(a.created_at);
   });
@@ -1503,8 +1511,22 @@ async function ndSave() {
     }
   } catch(e) { alert('Error saving note: ' + e.message); }
 }
+function custNotes(customer) {
+  // Returns all notes for a customer: direct customer notes + invoice-level notes
+  // for any invoice belonging to this customer
+  const custInvIds = new Set(
+    (D.invs||[]).filter(i => (i.consolidated_customer||'').toLowerCase() === customer.toLowerCase())
+                .map(i => (i.ar_invoice_id||'').trim())
+  );
+  return (D_notes||[]).filter(n =>
+    (n.ref_id||'').toLowerCase().includes(customer.toLowerCase()) ||
+    (n.invoice_id && custInvIds.has(n.invoice_id.trim()))
+  );
+}
+
 function noteBadgeHtml(customer) {
-  const n = (D_notes||[]).filter(x => (x.ref_id||'').toLowerCase().includes(customer.toLowerCase())).length;
+  const notes = custNotes(customer);
+  const n = notes.length;
   const cls = 'nd-badge' + (n > 0 ? ' has-notes' : '');
   const lbl = n > 0 ? '&#128203; ' + n : '&#128203;';
   return '<span class="'+cls+'" data-nd-customer="'+customer+'" onclick="openNotesDrawer(this.dataset.ndCustomer)" title="'+(n>0?n+' note'+(n>1?'s':''):'Add note')+'">'+lbl+'</span>';
@@ -2048,7 +2070,7 @@ function filterColl() {
   });
 
   document.getElementById('collbody').innerHTML = rows.map(c => {
-    const nCnt = D_notes.filter(n => (n.ref_id || '').toLowerCase().includes(c.customer.toLowerCase())).length;
+    const nCnt = custNotes(c.customer).length;
     const riskHtml = c.risks.map(r => `<span class="rtag">${r}</span>`).join('');
     const pcls = c.tier === 'Critical' ? 'pc' : c.tier === 'High' ? 'ph' : c.tier === 'Medium' ? 'pm' : 'pw';
     const aStyle = c.action === 'Escalate' ? 'b4' : 'b1';
@@ -2111,8 +2133,8 @@ function drillCust(customer) {
   loadCustTrend(customer);
 
   const sec = document.getElementById('drillsec');
-  sec.classList.remove('hidden');
-  setTimeout(() => sec.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  document.getElementById('drill-backdrop').classList.add('open');
+  sec.classList.add('open');
 }
 
 async function loadCustTrend(customer) {
@@ -2143,8 +2165,10 @@ async function loadCustTrend(customer) {
 }
 
 function closeDrill() {
-  document.getElementById('drillsec').classList.add('hidden');
-  document.getElementById('custTrendWrap').classList.add('hidden');
+  document.getElementById('drillsec').classList.remove('open');
+  document.getElementById('drill-backdrop').classList.remove('open');
+  const tw = document.getElementById('custTrendWrap');
+  if (tw) tw.classList.add('hidden');
   if (charts.custTrend) { charts.custTrend.destroy(); charts.custTrend = null; }
 }
 
@@ -2171,11 +2195,11 @@ function filterCust() {
   });
 
   const view = data.slice(0, custLim);
-  const noteCount = n => D_notes.filter(x => (x.ref_id || '').toLowerCase().includes(n.toLowerCase())).length;
+  const noteCount = n => custNotes(n).length;
 
   document.getElementById('custbody').innerHTML = view.map(c => {
     const pbC = (window.pbMap||{})[c.customer]||{}; const dtp = +pbC.avg_dtp||+c.avg_days_to_pay||0;
-    return `<tr>
+    return `<tr style="cursor:pointer" onclick="drillCust('${c.customer.replace(/'/g, "\\'")}')">
       <td><strong>${c.customer}</strong>${customerFlagBadges(c.customer)}</td>
       <td>${c.location}</td><td>${c.salesperson || '\u2014'}</td>
       <td class="amt">${c.num_invoices}</td>
@@ -2187,7 +2211,8 @@ function filterCust() {
       <td class="amt" style="${+c.bucket_90_plus > 0 ? 'color:var(--red);font-weight:700' : ''}">${fmt(+c.bucket_90_plus)}</td>
       <td class="amt" style="${+c.past_due > 0 ? 'color:var(--amber)' : ''}">${fmt(+c.past_due)}</td>
       <td class="amt">${dtp > 0 ? Math.round(dtp) + 'd' : '\u2014'}</td>
-      <td>${noteBadgeHtml(c.customer)}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">${flagCellHtml(c.customer)}</td>
+      <td onclick="event.stopPropagation()">${noteBadgeHtml(c.customer)}</td>
     </tr>`;
   }).join('');
 
@@ -3819,5 +3844,24 @@ function exportForecastExcel() {
     </div>
   </div>
 </div>
+
+<div id="drill-backdrop" onclick="closeDrill()"></div>
+<div id="drillsec">
+    <div class="shdr">
+      <div><div class="stitle" id="drilltitle">Invoice Detail</div><div class="ssub" id="drillsub"></div></div>
+      <button class="nbtn" style="padding:6px 14px" onclick="closeDrill()">Close &#x2715;</button>
+    </div>
+    <div class="scards" id="drillcards"></div>
+    <div id="custTrendWrap" class="hidden" style="border-top:1px solid var(--border);margin:4px 0">
+      <div class="shdr"><div class="stitle" style="font-size:13px">13-Week AR Trend for this Customer</div></div>
+      <div style="position:relative;height:220px;padding:12px"><canvas id="custTrendChart"></canvas></div>
+    </div>
+    <div style="overflow-x:auto">
+      <table><thead><tr>
+        <th>Invoice #</th><th>Plant</th><th>Invoice Date</th><th>Due Date</th>
+        <th class="amt">Balance</th><th class="amt">Days Past Due</th><th>Bucket</th><th>Note</th>
+      </tr></thead><tbody id="drillbody"></tbody></table>
+    </div>
+  </div>
 </body>
 </html>
