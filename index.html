@@ -196,6 +196,30 @@ tr.trow:hover td{background:var(--accent);color:#fff}
 }
 #drill-backdrop.open { display:block; }
 
+
+/* ── Haircut settings panel ───────────────────────────────────── */
+.hc-table { width:100%; border-collapse:collapse; font-size:12px; }
+.hc-table th { background:var(--bg3); padding:6px 10px; text-align:left;
+  font-weight:600; border-bottom:1px solid var(--border); white-space:nowrap; }
+.hc-table td { padding:6px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+.hc-table tr:hover td { background:var(--bg3); }
+.hc-input { width:70px; padding:3px 6px; border:1px solid var(--border);
+  border-radius:4px; background:var(--bg); color:var(--text);
+  font-size:12px; text-align:right; }
+.hc-input:focus { border-color:var(--accent); outline:none; }
+.hc-badge-atrisk { background:rgba(220,38,38,.12); color:var(--red);
+  border:1px solid rgba(220,38,38,.3); border-radius:3px;
+  padding:1px 6px; font-size:9px; font-weight:700; text-transform:uppercase; }
+.hc-prior { font-size:10px; color:var(--text2); }
+.hc-site-tab { padding:4px 12px; font-size:11px; border:1px solid var(--border);
+  border-radius:4px; cursor:pointer; background:var(--bg3); color:var(--text); }
+.hc-site-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); font-weight:600; }
+/* Forecast at-risk section */
+.atrisk-sec { border:1px solid rgba(220,38,38,.35); border-radius:6px;
+  background:rgba(220,38,38,.05); padding:12px 16px; margin-top:16px; }
+.atrisk-hdr { color:var(--red); font-weight:700; font-size:13px; margin-bottom:8px;
+  display:flex; align-items:center; gap:6px; }
+
 </style>
 </head>
 <body>
@@ -283,6 +307,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <div class="tab" data-tab="coll-forecast">&#128197; Collections Forecast</div>
   <div class="tdiv"></div>
   <span class="tgl">Team</span>
+  <div class="tab" data-tab="fc-variance" onclick="switchTab('fc-variance')">&#128200; Fcst vs Actual</div>
   <div class="tab" data-tab="notes">&#128221; Notes</div>
 </div>
 
@@ -428,7 +453,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     <div class="shdr" style="justify-content:space-between;gap:12px;flex-wrap:wrap">
       <div>
         <div class="stitle" id="agc-detail-title">Detail Table with 60+ AR Changes Month over Month</div>
-        <div class="ssub" id="agc-summary-sub">Top 30 customers ranked by Total AR · All others grouped</div>
+        <div class="ssub" id="agc-summary-sub">' + agcTopN + ' customers ranked by Total AR · All others grouped</div>
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div style="display:flex;gap:3px;align-items:center">
@@ -446,6 +471,19 @@ tr.trow:hover td{background:var(--accent);color:#fff}
           <button id="agc-view-60" onclick="setAgcView('60')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--accent);color:#fff;font-weight:600">Show 60+</button>
           <button id="agc-view-90" onclick="setAgcView('90')" style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Show 90+</button>
         </div>
+        <div style="display:flex;align-items:center;gap:4px">
+          <span style="font-size:11px;color:var(--text2)">Top:</span>
+          <select id="agc-top-n" onchange="loadAgingChange(agcPeriodMode)"
+            style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="30" selected>30</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="9999">All</option>
+          </select>
+        </div>
+        <button onclick="exportAgcExcel()" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text);font-weight:600">&#8681; Excel</button><button onclick="exportAgcCsv()" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text);font-weight:600">&#8681; CSV</button>
       </div>
     </div>
     <div style="overflow-x:auto">
@@ -679,6 +717,167 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   </div>
 </div>
 
+<!-- ══════════════ FORECAST VS ACTUAL ══════════════ -->
+<div class="panel" id="panel-fc-variance">
+  <div class="krow" id="fcv-kpis"></div>
+
+  <!-- ── Chart + Weekly Detail ── -->
+  <div class="sec" style="margin-bottom:16px">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Forecast vs Actual Collections</div>
+        <div class="ssub">Weekly snapshot forecast compared to actual collections</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <select id="fcv-loc" onchange="syncFcSite(this.value)"
+          style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+          <option value="Brookville">Brookville</option>
+          <option value="Kilgore">Kilgore</option>
+          <option value="Wilkes-Barre">Wilkes-Barre</option>
+        </select>
+        <button onclick="snapshotNow()"
+          style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">&#128247; Snapshot Now</button>
+      </div>
+    </div>
+    <div style="position:relative;height:280px;padding:16px"><canvas id="fcvChart" role="img" aria-label="Forecast vs actual collections chart">Collections forecast vs actual</canvas></div>
+  </div>
+
+  <!-- ── Weekly Detail ── -->
+  <div class="sec" style="margin-bottom:16px">
+    <div class="shdr"><div class="stitle">Weekly Detail</div>
+      <span style="font-size:11px;color:var(--text2)">Source: manual entry (M) or auto from collections MV (A)</span></div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>Week Of</th><th>Site</th><th>Snapshot</th>
+        <th class="amt">Forecast</th><th class="amt">Optimistic</th><th class="amt">Conservative</th>
+        <th class="amt">Actual</th><th>Src</th>
+        <th class="amt">Variance $</th><th class="amt">Var %</th><th>Status</th>
+      </tr></thead>
+      <tbody id="fcv-tbody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- ── Vintage Matrix ── -->
+  <div class="sec" style="margin-bottom:16px">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Vintage Convergence Matrix</div>
+        <div class="ssub">Rows = target week &bull; Columns = forecast vintage (T-0 = most recent, T-13 = oldest) &bull; Read across to see how forecast evolved</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="vm-scenario" onchange="renderVintageMatrix()"
+          style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+          <option value="base">Base (adjusted)</option>
+          <option value="opt">Optimistic (gross)</option>
+          <option value="cons">Conservative</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table id="vm-table">
+      <thead><tr id="vm-thead"></tr></thead>
+      <tbody id="vm-tbody"></tbody>
+    </table></div>
+    <div style="margin-top:8px;font-size:11px;color:var(--text2)">
+      Blanks (—) = target week was beyond the forecast horizon when that snapshot was taken. Matrix fills left-to-right as weekly snapshots accumulate.
+    </div>
+  </div>
+
+  <!-- ── Best-Fit Recovery Rates ── -->
+  <div class="sec">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Implied Recovery Rates</div>
+        <div class="ssub">Actual ÷ gross forecast &bull; Compared to assumed rate &bull; Drift = implied minus assumed</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>Week Of</th><th>Site</th>
+        <th class="amt">Gross Forecast</th><th class="amt">Assumed Rate</th>
+        <th class="amt">Adj. Forecast</th><th class="amt">Actual</th>
+        <th class="amt">Implied Rate</th><th class="amt">Rate Drift</th>
+        <th>Last Entered</th>
+      </tr></thead>
+      <tbody id="bf-tbody"></tbody>
+    </table></div>
+  </div>
+
+  <!-- ── Actuals Entry ── -->
+  <div class="sec" style="margin-top:16px">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Enter Actual Collections</div>
+        <div class="ssub">One row per closed week &bull; Changes are audited &bull; Manual entries override MV data</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="fcv-entry-loc"
+          style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)"
+          onchange="renderActualsEntry()">
+          <option value="Brookville">Brookville</option>
+          <option value="Kilgore">Kilgore</option>
+          <option value="Wilkes-Barre">Wilkes-Barre</option>
+        </select>
+      </div>
+    </div>
+    <div style="overflow-x:auto"><table>
+      <thead><tr>
+        <th>Week Of</th>
+        <th class="amt">Forecast (Adj.)</th>
+        <th class="amt">Current Actual</th>
+        <th class="amt" style="width:160px">Enter / Edit Actual</th>
+        <th class="amt">Variance</th>
+        <th>Last Changed By</th>
+        <th>Changed At</th>
+        <th>Prior Amount</th>
+        <th></th>
+      </tr></thead>
+      <tbody id="fcv-entry-tbody"></tbody>
+    </table></div>
+  </div>
+
+  <div class="sec" style="margin-bottom:16px">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Forecast vs Actual Collections</div>
+        <div class="ssub">Weekly snapshot forecast compared to actual collections &bull; Positive variance = beat forecast</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <select id="fcv-loc" onchange="syncFcSite(this.value)"
+          style="font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">
+          <option value="All">All Sites</option>
+          <option value="Brookville">Brookville</option>
+          <option value="Kilgore">Kilgore</option>
+          <option value="Wilkes-Barre">Wilkes-Barre</option>
+        </select>
+        <button onclick="snapshotNow()" title="Take a forecast snapshot now"
+          style="padding:4px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">&#128247; Snapshot Now</button>
+      </div>
+    </div>
+    <div style="position:relative;height:300px;padding:16px"><canvas id="fcvChart"></canvas></div>
+  </div>
+
+  <div class="sec">
+    <div class="shdr" style="justify-content:space-between">
+      <div class="stitle">Weekly Detail</div>
+      <span style="font-size:11px;color:var(--text2)">Forecast taken closest Monday before each collection week</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead><tr>
+          <th>Week Of</th><th>Site</th><th>Snapshot Date</th>
+          <th class="amt">Forecast (Adjusted)</th>
+          <th class="amt">Actual Collected</th>
+          <th class="amt">Variance $</th>
+          <th class="amt">Variance %</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody id="fcv-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
 <!-- ══════════════ NOTES ══════════════ -->
 <div class="panel" id="panel-notes">
   <div style="display:grid;grid-template-columns:300px 1fr;gap:20px">
@@ -776,10 +975,49 @@ tr.trow:hover td{background:var(--accent);color:#fff}
     &nbsp;Customers with <strong>3+ paid invoices</strong> use their own DTP. Others fall back to site avg (BV: 56d · KG: 52d · WB: 68d).
     &nbsp;Scenarios: <strong>Optimistic</strong> = avg &minus; 0.5&sigma; &nbsp;|&nbsp; <strong>Base</strong> = avg &nbsp;|&nbsp; <strong>Conservative</strong> = avg + 0.5&sigma; &minus; 15% haircut on overdue.
     &nbsp;Solid bars = current invoices &nbsp;|&nbsp; Faded bars = overdue recovery. Base dates in <span style="color:var(--red);font-weight:600">red</span> in the table are past due.
+  
+
+  <!-- ── Haircut / Recovery Rate Settings ── -->
+  <div class="sec" style="margin-top:20px" id="hc-settings-sec">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Recovery Rate Assumptions</div>
+        <div class="ssub">Configurable haircut by aging bucket and site &bull; Changes saved immediately and audited</div>
+      </div>
+      <button onclick="saveHaircutParams()" style="padding:5px 16px;background:var(--accent);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600">Save Changes</button>
+    </div>
+    <div style="display:flex;gap:6px;margin:12px 0 10px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text2);align-self:center;margin-right:4px">Site:</span>
+      <button id="hc-tab-All" class="hc-site-tab active" onclick="syncFcSite('All')">All Sites</button>
+      <button id="hc-tab-Brookville" class="hc-site-tab" onclick="syncFcSite('Brookville')">Brookville</button>
+      <button id="hc-tab-Kilgore" class="hc-site-tab" onclick="syncFcSite('Kilgore')">Kilgore</button>
+      <button id="hc-tab-WilkesBarre" class="hc-site-tab" onclick="syncFcSite('Wilkes-Barre')">Wilkes-Barre</button>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="hc-table">
+        <thead><tr>
+          <th>Aging Bucket</th>
+          <th class="amt">Current Balance</th>
+          <th style="text-align:center">Recovery Rate %</th>
+          <th style="text-align:center">Haircut %</th>
+          <th class="amt">Adjusted Balance</th>
+          <th>Last Changed</th>
+          <th>Changed By</th>
+          <th>Prior Rate</th>
+        </tr></thead>
+        <tbody id="hc-tbody"></tbody>
+      </table>
+    </div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text2)">
+      <strong>Note:</strong> Site-specific rates override All Sites defaults.
+      180+ days past due are flagged <span class="hc-badge-atrisk">At-Risk</span> and shown separately below.
+    </div>
   </div>
+
+</div>
   <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
     <div style="display:flex;align-items:center;gap:6px"><label style="font-size:12px;color:var(--text2)">Site</label>
-      <select id="fc-site" onchange="renderForecast()" style="font-size:12px">
+      <select id="fc-site" onchange="syncFcSite(this.value==='all'?'All':this.value)" style="font-size:12px">
         <option value="all">All Sites</option>
         <option value="Brookville">Brookville</option>
         <option value="Kilgore">Kilgore</option>
@@ -947,6 +1185,17 @@ const ago = ts => {
   if (m < 1440) return Math.floor(m / 60) + 'h ago';
   return Math.floor(m / 1440) + 'd ago';
 };
+
+// ── KPI card helper ──────────────────────────────────────────────
+const kCard = (label, value, sub, color) => {
+  const c = color || 'var(--text)';
+  return '<div class="k">'
+    + '<div class="kl">' + label + '</div>'
+    + '<div class="kv" style="color:' + c + '">' + value + '</div>'
+    + (sub ? '<div class="ks">' + sub + '</div>' : '')
+    + '</div>';
+};
+
 const fmtDate = s => {
   if (!s) return '\u2014';
   const d = new Date(s + 'T00:00:00');
@@ -1233,8 +1482,9 @@ function applyAgcRankAndRender() {
                   : agcRankMode === '90' ? 'rank_by_90'
                   : 'rank_by_ar';
 
-  const top30  = data.filter(r => (+r[rankField] || 999) <= 30);
-  const others = data.filter(r => (+r[rankField] || 999) > 30);
+  const agcTopN = +(document.getElementById('agc-top-n')?.value || 30);
+  const top30   = data.filter(r => (+r[rankField] || 999) <= agcTopN);
+  const others  = data.filter(r => (+r[rankField] || 999) > agcTopN);
 
   const sum = (arr, key) => arr.reduce((s, r) => s + (+r[key] || 0), 0);
   const ROLLUP_FIELDS = ['now_60','now_90','m1_60','m1_90','m2_60','m2_90',
@@ -1669,6 +1919,680 @@ function sortWow(col) {
   filterWow();
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// AGC EXPORT — builds dataset for both Excel and CSV
+// Follows same pattern as exportForecastExcel
+// ══════════════════════════════════════════════════════════════════
+function buildAgcExportData() {
+  const dim        = (document.getElementById('agc-view-90')?.style.background || '').includes('accent') ||
+                     (document.getElementById('agc-view-90')?.style.background === 'var(--accent)') ? '90' : '60';
+  const periodMode = agcPeriodMode || 'monthly';
+  const rankMode   = agcRankMode   || 'ar';
+  const agcTopN    = +(document.getElementById('agc-top-n')?.value || 30);
+  const data       = (periodMode === 'weekly' ? D_aging_change_weekly : D_aging_change_monthly) || [];
+
+  const nowKey  = 'now_' + dim;
+  const chgKeys = ['chg_m0_m1_'+dim,'chg_m1_m2_'+dim,'chg_m2_m3_'+dim,'chg_m3_m4_'+dim,'chg_m4_m5_'+dim];
+  const sample  = data[0] || {};
+  const periodWord = periodMode === 'weekly' ? 'Week' : 'Month';
+
+  const chgLabels = [
+    'vs ' + (sample.m1_label || (periodMode==='weekly'?'W-1':'M-1')),
+    (sample.m1_label||'M-1') + ' to ' + (sample.m2_label||'M-2'),
+    (sample.m2_label||'M-2') + ' to ' + (sample.m3_label||'M-3'),
+    (sample.m3_label||'M-3') + ' to ' + (sample.m4_label||'M-4'),
+    (sample.m4_label||'M-4') + ' to ' + (sample.m5_label||'M-5'),
+  ];
+
+  const rankField = rankMode === '60' ? 'rank_by_60' : rankMode === '90' ? 'rank_by_90' : 'rank_by_ar';
+
+  const sorted = [...data].sort((a, b) =>
+    (+a[rankField] || 999) - (+b[rankField] || 999)
+  );
+
+  const topRows   = sorted.filter(r => (+r[rankField] || 999) <= agcTopN);
+  const otherRows = sorted.filter(r => (+r[rankField] || 999) > agcTopN);
+  const allRows   = [...topRows, ...otherRows];
+  const sumF      = (arr, f) => arr.reduce((s, r) => s + (+r[f] || 0), 0);
+
+  const header = [
+    'Customer', 'Site', 'Salesperson',
+    'Total AR',
+    dim === '90' ? '90+ AR Now' : '60+ AR Now',
+    ...chgLabels,
+    'Rank (' + (rankMode==='60'?'60+':rankMode==='90'?'90+':'Total AR') + ')',
+    'Past Due', '90+ AR', '60+ AR',
+  ];
+
+  const toRow = r => [
+    r.customer    || '',
+    r.location    || '',
+    r.salesperson || '',
+    +r.total_ar   || 0,
+    +r[nowKey]    || 0,
+    ...chgKeys.map(k => +r[k] || 0),
+    +r[rankField] || null,
+    +r.past_due   || 0,
+    +r.now_90     || 0,
+    +r.now_60     || 0,
+  ];
+
+  const dataRows = topRows.map(toRow);
+
+  if (otherRows.length) {
+    dataRows.push([
+      'All Others (' + otherRows.length + ' customers)', '', '',
+      sumF(otherRows,'total_ar'), sumF(otherRows,nowKey),
+      ...chgKeys.map(k => sumF(otherRows,k)),
+      null,
+      sumF(otherRows,'past_due'), sumF(otherRows,'now_90'), sumF(otherRows,'now_60'),
+    ]);
+  }
+
+  dataRows.push([
+    'TOTAL', '', '',
+    sumF(allRows,'total_ar'), sumF(allRows,nowKey),
+    ...chgKeys.map(k => sumF(allRows,k)),
+    null,
+    sumF(allRows,'past_due'), sumF(allRows,'now_90'), sumF(allRows,'now_60'),
+  ]);
+
+  return { header, dataRows, dim, periodMode, rankMode, agcTopN, periodWord, otherRowCount: otherRows.length };
+}
+
+function exportAgcExcel() {
+  const { header, dataRows, dim, periodMode, agcTopN } = buildAgcExportData();
+
+  if (!dataRows.length) { alert('No data loaded — please open the Aging Change tab first.'); return; }
+
+  if (typeof XLSX === 'undefined') {
+    alert('Loading Excel library — please try again in a moment.');
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = exportAgcExcel;
+    document.head.appendChild(s);
+    return;
+  }
+
+  const wb = XLSX.utils.book_new();
+  const sheetData = [];
+
+  // Metadata
+  sheetData.push(['Apex Geotech — Aging Change Detail']);
+  sheetData.push([
+    'View: ' + (dim==='90'?'90+':'60+') + ' AR',
+    'Period: ' + periodMode,
+    'Top N: ' + agcTopN,
+    'Generated: ' + new Date().toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'}),
+  ]);
+  sheetData.push([]);
+
+  sheetData.push(header);
+  const headerRowIdx = sheetData.length - 1;
+
+  dataRows.forEach(row => sheetData.push(row));
+
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+
+  // Column widths
+  ws['!cols'] = [
+    {wch:35}, {wch:14}, {wch:20},
+    {wch:14}, {wch:14},
+    {wch:16}, {wch:16}, {wch:16}, {wch:16}, {wch:16},
+    {wch:10},
+    {wch:14}, {wch:14}, {wch:14},
+  ];
+
+  // Number format — accounting with 2dp, negatives in red
+  const numFmt  = '#,##0.00;[Red]-#,##0.00';
+  const numCols = [3,4,5,6,7,8,9,11,12,13];
+  for (let ri = headerRowIdx + 1; ri < sheetData.length; ri++) {
+    numCols.forEach(ci => {
+      const ref = XLSX.utils.encode_cell({r:ri, c:ci});
+      if (ws[ref] && ws[ref].t === 'n') ws[ref].z = numFmt;
+    });
+  }
+
+  // Header row style
+  header.forEach((_, ci) => {
+    const ref = XLSX.utils.encode_cell({r:headerRowIdx, c:ci});
+    if (!ws[ref]) return;
+    ws[ref].s = {
+      font:      {bold:true, color:{rgb:'FFFFFF'}},
+      fill:      {fgColor:{rgb:'1F4E79'}},
+      alignment: {horizontal:'center', wrapText:true},
+    };
+  });
+
+  // Total row style (last row)
+  const totalRowIdx = sheetData.length - 1;
+  header.forEach((_, ci) => {
+    const ref = XLSX.utils.encode_cell({r:totalRowIdx, c:ci});
+    if (!ws[ref]) return;
+    ws[ref].s = {font:{bold:true, color:{rgb:'FFFFFF'}}, fill:{fgColor:{rgb:'1F4E79'}}};
+  });
+
+  // Freeze panes below header
+  ws['!freeze'] = {xSplit:0, ySplit: headerRowIdx + 1};
+
+  const dimLabel = dim === '90' ? '90plus' : '60plus';
+  const dateStr  = new Date().toISOString().slice(0,10);
+  XLSX.utils.book_append_sheet(wb, ws, 'Aging Change');
+  XLSX.writeFile(wb, 'aging_change_' + dimLabel + '_' + periodMode + '_' + dateStr + '.xlsx');
+}
+
+function exportAgcCsv() {
+  const { header, dataRows } = buildAgcExportData();
+  if (!dataRows.length) { alert('No data loaded — please open the Aging Change tab first.'); return; }
+
+  const escCsv = v => {
+    if (v == null) return '';
+    const s = String(v);
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g,'""') + '"' : s;
+  };
+
+  const lines = [header, ...dataRows].map(row => row.map(escCsv).join(','));
+  const blob  = new Blob([lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href     = url;
+  a.download = 'aging_change_' + (document.getElementById('agc-view-90')?.style.background?.includes('accent') ? '90plus' : '60plus') + '_' + (agcPeriodMode||'monthly') + '_' + dateStr + '.csv';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════
+// HAIRCUT PARAMS — load, render, save, audit
+// ══════════════════════════════════════════════════════════════════
+let D_haircut = [];
+let hcSite    = 'All';
+
+const HC_BUCKETS = ['current','1-30','31-60','61-90','90-180','180+'];
+const HC_LABELS  = {
+  'current': 'Current (not yet overdue)',
+  '1-30':    '1–30 Days Past Due',
+  '31-60':   '31–60 Days Past Due',
+  '61-90':   '61–90 Days Past Due',
+  '90-180':  '90–180 Days Past Due',
+  '180+':    '180+ Days Past Due',
+};
+
+async function loadHaircutParams() {
+  D_haircut = await get('forecast_haircut_params?select=*&order=location,bucket');
+}
+
+function setHcSite(loc) {
+  hcSite = loc;
+  document.querySelectorAll('.hc-site-tab').forEach(b => b.classList.remove('active'));
+  const key = 'hc-tab-' + loc.replace(/-/g,'').replace(/ /g,'');
+  const btn = document.getElementById(key);
+  if (btn) btn.classList.add('active');
+  renderHaircutTable();
+}
+
+function getHcRow(loc, bucket) {
+  // Site-specific first, then fall back to 'All'
+  return D_haircut.find(r => r.location === loc && r.bucket === bucket)
+      || D_haircut.find(r => r.location === 'All' && r.bucket === bucket)
+      || null;
+}
+
+function renderHaircutTable() {
+  const tbody = document.getElementById('hc-tbody');
+  if (!tbody) return;
+
+  // Compute current balance per bucket from O2C.fcInvoices
+  // Filter by active hcSite if not 'All'
+  const hcInvs = (O2C.fcInvoices || []).filter(r =>
+    hcSite === 'All' || r.location === hcSite
+  );
+  const bucketBalances = {};
+  const bucketAdjusted = {};
+  HC_BUCKETS.forEach(b => {
+    const matching = hcInvs.filter(r => r.aging_bucket === b);
+    bucketBalances[b] = matching.reduce((s,r) => s + (+r.invoice_balance||0), 0);
+    bucketAdjusted[b] = matching.reduce((s,r) => s + (+r.adjusted_balance||0), 0);
+  });
+
+  tbody.innerHTML = HC_BUCKETS.map(bucket => {
+    const row     = getHcRow(hcSite, bucket);
+    const allRow  = getHcRow('All', bucket);
+    const rate    = row ? +(row.recovery_rate) : (allRow ? +(allRow.recovery_rate) : 1);
+    const isInherited = hcSite !== 'All' && (!row || row.location !== hcSite);
+    const pct     = (rate * 100).toFixed(1);
+    const haircut = ((1 - rate) * 100).toFixed(1);
+    const isAR    = bucket === '180+';
+    const gross   = bucketBalances[bucket] || 0;
+    const adj     = bucketAdjusted[bucket] || 0;
+    const hcAmt   = gross - adj;
+
+    const priorPct = row?.prior_rate != null
+      ? (+(row.prior_rate) * 100).toFixed(1) + '%'
+      : '—';
+    const changedAt = row?.updated_at
+      ? new Date(row.updated_at).toLocaleDateString('en-US', {month:'short',day:'numeric',year:'numeric'})
+      : '—';
+    const changedBy = row?.updated_by || '—';
+
+    return `<tr>
+      <td>
+        <strong>${HC_LABELS[bucket]}</strong>
+        ${isAR ? ' <span class="hc-badge-atrisk">At-Risk</span>' : ''}
+        ${isInherited ? ' <span style="font-size:10px;color:var(--text2)">(using All default)</span>' : ''}
+      </td>
+      <td class="amt" style="color:var(--text2)">${gross > 0 ? fmtK(gross) : '—'}</td>
+      <td style="text-align:center">
+        <input class="hc-input" id="hc-input-${bucket.replace('+','plus').replace('-','to')}"
+          type="number" min="0" max="100" step="1" value="${pct}"
+          title="Recovery rate for ${bucket} bucket at ${hcSite}">%
+      </td>
+      <td style="text-align:center;color:${+haircut > 0 ? 'var(--red)' : 'var(--text2)'};font-weight:${+haircut > 0 ? '600' : '400'}">
+        ${haircut}%
+        ${gross > 0 && +haircut > 0 ? '<div style="font-size:9px;color:var(--red);font-weight:400">(' + fmtK(hcAmt) + ')</div>' : ''}
+      </td>
+      <td class="amt" style="font-weight:600">${gross > 0 ? fmtK(adj) : '—'}</td>
+      <td class="hc-prior">${changedAt}</td>
+      <td class="hc-prior">${changedBy}</td>
+      <td class="hc-prior" title="Prior rate before last change">${priorPct}</td>
+    </tr>`;
+  }).join('');
+
+  // Totals row
+  const totalGross = HC_BUCKETS.reduce((s,b) => s+(bucketBalances[b]||0), 0);
+  const totalAdj   = HC_BUCKETS.reduce((s,b) => s+(bucketAdjusted[b]||0), 0);
+  const totalHc    = totalGross - totalAdj;
+  tbody.innerHTML += `<tr style="border-top:2px solid var(--border);font-weight:600">
+    <td>Total</td>
+    <td class="amt">${totalGross>0?fmtK(totalGross):'—'}</td>
+    <td></td>
+    <td style="text-align:center;color:${totalHc>0?'var(--red)':'var(--text2)'}">
+      ${totalGross>0?(((totalHc/totalGross)*100).toFixed(1)+'%'):'—'}
+      ${totalGross>0&&totalHc>0?'<div style="font-size:9px;color:var(--red);font-weight:400">('+fmtK(totalHc)+')</div>':''}
+    </td>
+    <td class="amt">${totalAdj>0?fmtK(totalAdj):'—'}</td>
+    <td colspan="3"></td>
+  </tr>`;
+
+  // Live haircut % update as user types
+  HC_BUCKETS.forEach(bucket => {
+    const id = 'hc-input-' + bucket.replace('+','plus').replace('-','to');
+    const inp = document.getElementById(id);
+    if (!inp) return;
+    inp.oninput = () => {
+      const val = Math.min(100, Math.max(0, +inp.value));
+      const hc = (100 - val).toFixed(1);
+      const td = inp.closest('tr').querySelectorAll('td')[2];
+      td.textContent = hc + '%';
+      td.style.color = +hc > 0 ? 'var(--red)' : 'var(--text2)';
+      td.style.fontWeight = +hc > 0 ? '600' : '400';
+    };
+  });
+}
+
+async function saveHaircutParams() {
+  const author = localStorage.getItem('ar_author') || 'Unknown';
+  const updates = [];
+
+  for (const bucket of HC_BUCKETS) {
+    const id = 'hc-input-' + bucket.replace('+','plus').replace('-','to');
+    const inp = document.getElementById(id);
+    if (!inp) continue;
+    const newRate = Math.min(1, Math.max(0, +(+inp.value / 100).toFixed(4)));
+
+    const existing = D_haircut.find(r => r.location === hcSite && r.bucket === bucket);
+    const oldRate  = existing ? +existing.recovery_rate : null;
+
+    if (existing && Math.abs(newRate - oldRate) < 0.0001) continue; // no change
+
+    updates.push({ bucket, newRate, oldRate, existing });
+  }
+
+  if (!updates.length) {
+    addMsg('No changes to save.', 'info'); return;
+  }
+
+  let saved = 0;
+  for (const { bucket, newRate, oldRate, existing } of updates) {
+    try {
+      const payload = {
+        location:        hcSite,
+        bucket,
+        recovery_rate:   newRate,
+        updated_at:      new Date().toISOString(),
+        updated_by:      author,
+        prior_rate:      oldRate,
+        prior_updated_at: existing?.updated_at || null,
+        prior_updated_by: existing?.updated_by || null,
+      };
+
+      if (existing) {
+        await patch('forecast_haircut_params?location=eq.' + encodeURIComponent(hcSite)
+          + '&bucket=eq.' + encodeURIComponent(bucket), payload);
+        Object.assign(existing, payload);
+      } else {
+        const r = await post('forecast_haircut_params', payload);
+        const d = await r.json();
+        if (d?.[0]) D_haircut.push(d[0]);
+      }
+
+      // Write audit row
+      await post('forecast_haircut_audit', {
+        location:   hcSite,
+        bucket,
+        old_rate:   oldRate,
+        new_rate:   newRate,
+        changed_at: new Date().toISOString(),
+        changed_by: author,
+        notes: `Changed from ${oldRate != null ? (oldRate*100).toFixed(1)+'%' : 'default'} to ${(newRate*100).toFixed(1)}%`,
+      });
+      saved++;
+    } catch(e) { console.error('Haircut save failed:', bucket, e); }
+  }
+
+  renderHaircutTable();
+  renderForecast(); // refresh forecast with new rates
+  addMsg(saved + ' rate' + (saved>1?'s':'') + ' saved for ' + hcSite + '.', 'success');
+}
+
+
+
+// ══════════════════════════════════════════════════════════════════
+// FORECAST VS ACTUAL — extended JS
+// ══════════════════════════════════════════════════════════════════
+let D_fcv      = [];
+let D_fvm      = [];   // vintage matrix data
+let fcvLoaded  = false;
+let fvmLoaded  = false;
+
+async function loadFcVariance() {
+  const loc = document.getElementById('fcv-loc')?.value || 'Brookville';
+  D_fcv = await get('v_forecast_vs_actual?select=*&location=eq.' + encodeURIComponent(loc) + '&order=collection_week.desc');
+  fcvLoaded = true;
+}
+
+async function loadVintageMatrix() {
+  const loc = document.getElementById('fcv-loc')?.value || 'Brookville';
+  D_fvm = await get('v_forecast_vintage_matrix?select=*&location=eq.' + encodeURIComponent(loc) + '&order=collection_week.desc');
+  fvmLoaded = true;
+}
+
+async function renderFcVariance() {
+  const loc = document.getElementById('fcv-loc')?.value || 'Brookville';
+  ld('Loading forecast data…');
+  D_fcv = await get('v_forecast_vs_actual?select=*&location=eq.' + encodeURIComponent(loc) + '&order=collection_week.desc');
+  D_fvm = await get('v_forecast_vintage_matrix?select=*&location=eq.' + encodeURIComponent(loc) + '&order=collection_week.desc');
+  fcvLoaded = fvmLoaded = true;
+  hideLoader();
+
+  const today = new Date().toISOString().slice(0,10);
+  const allWks = [...new Set(D_fcv.map(r => r.collection_week))].sort();
+  const pastWks = allWks.filter(w => w <= today).slice(-4);
+  const futWks  = allWks.filter(w => w > today).slice(0, 9);
+  const weeks   = [...pastWks, ...futWks];
+
+  // ── KPIs ──────────────────────────────────────────────────────
+  const weekMap = {};
+  D_fcv.forEach(r => {
+    const w = r.collection_week;
+    if (!weekMap[w]) weekMap[w] = { forecast:0, actual:0, past: r.week_is_past === true || r.week_is_past === 'true' };
+    weekMap[w].forecast += +r.forecast_adjusted||0;
+    weekMap[w].actual   += +r.actual_collected||0;
+  });
+  const pastWeeks = weeks.filter(w => weekMap[w]?.past);
+  const totalFc   = pastWeeks.reduce((s,w) => s+(weekMap[w]?.forecast||0), 0);
+  const totalAct  = pastWeeks.reduce((s,w) => s+(weekMap[w]?.actual||0), 0);
+  const totalVar  = totalAct - totalFc;
+  const varPct    = totalFc > 0 ? (totalVar/totalFc*100).toFixed(1) : '—';
+  const wksBeat   = pastWeeks.filter(w => (weekMap[w]?.actual||0) >= (weekMap[w]?.forecast||0)).length;
+
+  const kEl = document.getElementById('fcv-kpis');
+  if (kEl) kEl.innerHTML =
+      kCard('Total Forecast (Past Wks)', fmt(totalFc), 'Adj. forecast · ' + loc, '#185fa5')
+    + kCard('Total Actual', fmt(totalAct), 'Actual collections · ' + loc, '#185fa5')
+    + kCard('Variance', (totalVar>=0?'+':'')+fmt(totalVar), varPct+'% vs forecast', totalVar>=0?'#1d9e75':'#e24b4a')
+    + kCard('Weeks Beat', wksBeat+' / '+pastWeeks.length, 'Weeks actual ≥ forecast', '#185fa5');
+
+  // ── Chart ─────────────────────────────────────────────────────
+  const labels  = weeks.map(w => new Date(w+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}));
+  const fcVals  = weeks.map(w => Math.round(weekMap[w]?.forecast||0));
+  const actVals = weeks.map(w => Math.round(weekMap[w]?.actual||0));
+  const varVals = weeks.map(w => Math.round((weekMap[w]?.actual||0)-(weekMap[w]?.forecast||0)));
+  const ctx = document.getElementById('fcvChart')?.getContext('2d');
+  if (!ctx) return;
+  if (charts.fcv) charts.fcv.destroy();
+  charts.fcv = new Chart(ctx, {
+    data: { labels, datasets: [
+      { type:'bar', label:'Forecast', data:fcVals, backgroundColor:'rgba(139,35,50,.2)', borderColor:'#8b2332', borderWidth:1.5 },
+      { type:'bar', label:'Actual',   data:actVals, backgroundColor:'rgba(29,158,117,.25)', borderColor:'#1d9e75', borderWidth:1.5 },
+      { type:'line',label:'Variance', data:varVals, borderColor:'#378add', borderWidth:2, pointRadius:4, fill:false, tension:0.3, yAxisID:'y2' },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{position:'top',labels:{font:{size:11},boxWidth:12}},
+        tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtK(+c.raw)}} },
+      scales:{ x:{ticks:{font:{size:11},maxRotation:45,autoSkip:false}},
+        y:{ticks:{callback:v=>fmtK(v)},title:{display:true,text:'Collections ($)',font:{size:11}}},
+        y2:{position:'right',ticks:{callback:v=>fmtK(v)},title:{display:true,text:'Variance',font:{size:11}},grid:{drawOnChartArea:false}} }
+    }
+  });
+
+  // ── Weekly detail table ───────────────────────────────────────
+  const tbody = document.getElementById('fcv-tbody');
+  const srcBadge = s => s==='manual'?'<span style="font-size:9px;font-weight:700;color:#185fa5">M</span>'
+    : s==='mv'?'<span style="font-size:9px;color:var(--text2)">A</span>':'<span style="font-size:9px;color:var(--text2)">—</span>';
+  const varCol = v => +v>0?'color:#1d9e75;font-weight:600':+v<0?'color:#e24b4a;font-weight:600':'';
+  const statusBadge = r => {
+    const past = r.week_is_past===true||r.week_is_past==='true';
+    const act  = +r.actual_collected;
+    if (!past) return '<span style="font-size:10px;color:#185fa5">Upcoming</span>';
+    if (act===0) return '<span style="font-size:10px;color:#ba7517">Awaiting</span>';
+    return act>=+r.forecast_adjusted
+      ? '<span style="font-size:10px;color:#1d9e75;font-weight:600">&#10003; Beat</span>'
+      : '<span style="font-size:10px;color:#e24b4a;font-weight:600">&#8593; Missed</span>';
+  };
+  const tableRows = D_fcv.filter(r => weeks.includes(r.collection_week));
+  if (tbody) tbody.innerHTML = tableRows.map(r => {
+    const fc  = +r.forecast_adjusted||0, act = +r.actual_collected||0;
+    const v   = act - fc;
+    const vp  = fc>0?(v/fc*100).toFixed(1)+'%':'—';
+    const snap = r.forecast_as_of ? new Date(r.forecast_as_of+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric'}) : '—';
+    return '<tr>'
+      +'<td>'+new Date(r.collection_week+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})+'</td>'
+      +'<td style="font-size:11px">'+r.location+'</td>'
+      +'<td style="font-size:11px;color:var(--text2)">'+snap+'</td>'
+      +'<td class="amt">'+fmt(fc)+'</td>'
+      +'<td class="amt" style="color:var(--text2)">'+fmt(+r.forecast_optimistic||0)+'</td>'
+      +'<td class="amt" style="color:var(--text2)">'+fmt(+r.forecast_conservative||0)+'</td>'
+      +'<td class="amt">'+(act>0?fmt(act):'<span style="color:var(--text2)">—</span>')+'</td>'
+      +'<td style="text-align:center">'+srcBadge(r.actual_source)+'</td>'
+      +'<td class="amt" style="'+varCol(v)+'">'+((+r.actual_collected>0)?((v>=0?'+':'')+fmt(Math.abs(v))):'—')+'</td>'
+      +'<td class="amt" style="'+varCol(v)+'">'+((+r.actual_collected>0)?((v>=0?'+':'')+vp):'—')+'</td>'
+      +'<td>'+statusBadge(r)+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text2);padding:20px">No data for this site</td></tr>';
+
+  renderVintageMatrix();
+  renderBestFitTable();
+  renderActualsEntry();
+}
+
+function renderVintageMatrix() {
+  const scen = document.getElementById('vm-scenario')?.value || 'base';
+  const sfx  = scen==='opt'?'_opt':scen==='cons'?'_cons':'_base';
+  const thead = document.getElementById('vm-thead');
+  const tbody = document.getElementById('vm-tbody');
+  if (!thead||!tbody||!D_fvm.length) return;
+
+  // How many horizons do we have data for?
+  const maxHorizon = 13;
+  const cols = [];
+  for (let i=0; i<=maxHorizon; i++) {
+    const key = 't'+i+sfx;
+    if (D_fvm.some(r => r[key] != null)) cols.push(i);
+  }
+
+  thead.innerHTML = '<th style="text-align:left;font-size:11px">Target Week</th>'
+    + cols.map(i => '<th class="amt" style="font-size:10px">T-'+i+'<br><span style="font-weight:400;color:var(--text2)">'
+      + (i===0?'Current':'Vintage -'+i)+'</span></th>').join('')
+    + '<th class="amt" style="font-size:10px">Actual</th>'
+    + '<th class="amt" style="font-size:10px">Implied Rate</th>';
+
+  tbody.innerHTML = D_fvm.map(r => {
+    const past = r.week_is_past===true||r.week_is_past==='true';
+    const act  = r.best_actual;
+    const wkLbl = new Date(r.collection_week+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'});
+    const cells = cols.map(i => {
+      const val = r['t'+i+sfx];
+      if (val == null) return '<td class="amt" style="color:var(--text2)">—</td>';
+      const isCur = i===0;
+      const bg = isCur && !past ? 'background:rgba(24,95,165,.08);color:#185fa5' : '';
+      return '<td class="amt" style="'+bg+'">'+fmtK(+val)+'</td>';
+    }).join('');
+    const actCell = act!=null
+      ? '<td class="amt" style="color:#1d9e75;font-weight:600">'+fmtK(+act)+'</td>'
+      : past?'<td class="amt" style="color:#ba7517;font-size:10px">Awaiting</td>'
+            :'<td class="amt" style="color:var(--text2);font-size:10px">Upcoming</td>';
+    const impliedCell = r.implied_recovery_pct!=null
+      ? '<td class="amt" style="font-size:11px">'+(+r.rate_drift_pp>=0?'<span style="color:#1d9e75">':'<span style="color:#e24b4a;">') + r.implied_recovery_pct+'%</span></td>'
+      : '<td class="amt" style="color:var(--text2)">—</td>';
+    return '<tr><td style="font-weight:500;font-size:12px">'+wkLbl+'</td>'+cells+actCell+impliedCell+'</tr>';
+  }).join('') || '<tr><td colspan="20" style="text-align:center;color:var(--text2);padding:20px">No matrix data yet — snapshots accumulate weekly</td></tr>';
+}
+
+function renderBestFitTable() {
+  const tbody = document.getElementById('bf-tbody');
+  if (!tbody||!D_fvm.length) return;
+  const rows = D_fvm.filter(r => r.gross_t0 != null);
+  tbody.innerHTML = rows.map(r => {
+    const past = r.week_is_past===true||r.week_is_past==='true';
+    const act  = r.best_actual;
+    const drift = r.rate_drift_pp;
+    const driftCol = drift==null?'':+drift>0?'color:#1d9e75;font-weight:600':+drift<0?'color:#e24b4a;font-weight:600':'';
+    const lastEntered = r.entered_by
+      ? r.entered_by + '<br><span style="font-size:10px;color:var(--text2)">'
+        + (r.entered_at?new Date(r.entered_at).toLocaleDateString('en-US',{month:'short',day:'numeric'}):'') + '</span>'
+      : '<span style="color:var(--text2);font-size:10px">—</span>';
+    return '<tr>'
+      +'<td style="font-weight:500">'+new Date(r.collection_week+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})+'</td>'
+      +'<td style="font-size:11px">'+r.location+'</td>'
+      +'<td class="amt">'+fmtK(+r.gross_t0||0)+'</td>'
+      +'<td class="amt" style="color:var(--text2)">'+(r.assumed_recovery_pct!=null?r.assumed_recovery_pct+'%':'—')+'</td>'
+      +'<td class="amt">'+fmtK(+r.t0_base||0)+'</td>'
+      +'<td class="amt" style="font-weight:500">'+(act!=null?fmt(+act):past?'<span style="color:#ba7517;font-size:10px">Awaiting</span>':'<span style="color:var(--text2);font-size:10px">Upcoming</span>')+'</td>'
+      +'<td class="amt">'+(r.implied_recovery_pct!=null?'<strong>'+r.implied_recovery_pct+'%</strong>':'—')+'</td>'
+      +'<td class="amt" style="'+driftCol+'">'+(drift!=null?(+drift>=0?'+':'')+drift+' pp':'—')+'</td>'
+      +'<td style="font-size:11px">'+lastEntered+'</td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:20px">No closed weeks with actuals yet</td></tr>';
+}
+
+function renderActualsEntry() {
+  const loc   = document.getElementById('fcv-entry-loc')?.value || 'Brookville';
+  const tbody = document.getElementById('fcv-entry-tbody');
+  if (!tbody) return;
+  const today = new Date().toISOString().slice(0,10);
+
+  // Build entry rows from D_fcv filtered to this loc, past weeks only
+  const rows = D_fcv
+    .filter(r => r.location === loc)
+    .filter(r => r.collection_week <= today)
+    .sort((a,b) => b.collection_week.localeCompare(a.collection_week));
+
+  tbody.innerHTML = rows.map(r => {
+    const fc   = +r.forecast_adjusted||0;
+    const act  = r.actual_source==='manual' ? +r.actual_collected : null;
+    const mvAct = r.actual_source==='mv'    ? +r.actual_collected : null;
+    const v    = (act||mvAct||0) - fc;
+    const varCol = act!=null&&+v>0?'color:#1d9e75;font-weight:600':act!=null&&+v<0?'color:#e24b4a;font-weight:600':'color:var(--text2)';
+    const wkKey  = r.collection_week + '_' + loc.replace(/[\s-]/g,'');
+    const lastBy = r.entered_by
+      ? '<div style="font-size:11px">'+r.entered_by+'</div>'
+        +'<div style="font-size:10px;color:var(--text2)">'+(r.entered_at?new Date(r.entered_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric',hour:'numeric',minute:'2-digit'}):'')+'</div>'
+      : '<div style="font-size:11px;color:var(--text2)">Not yet entered</div>';
+    const priorAmt = r.prior_amount!=null
+      ? '<div style="font-size:10px;color:var(--text2)">Prior: '+fmt(+r.prior_amount)
+        +(r.prior_entered_by?' by '+r.prior_entered_by:'')+'</div>'
+      : '';
+    return '<tr>'
+      +'<td style="font-weight:500">'+new Date(r.collection_week+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'})+'</td>'
+      +'<td class="amt">'+fmt(fc)+'</td>'
+      +'<td class="amt" style="color:#1d9e75">'+(act!=null?fmt(act):(mvAct!=null?'<span style="color:var(--text2);font-size:10px">'+fmt(mvAct)+' (auto)</span>':'<span style="color:var(--text2)">—</span>'))+'</td>'
+      +'<td class="amt"><input type="text" id="ae-'+wkKey+'" value="'+(act!=null?Math.round(act).toLocaleString():'').toString()+'" placeholder="Enter amount"'
+        +' style="width:130px;text-align:right;font-size:11px;padding:3px 6px;border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)"></td>'
+      +'<td class="amt" style="'+varCol+'">'+(act!=null?(+v>=0?'+':'')+fmt(Math.abs(+v)):(mvAct!=null?(+v>=0?'+':'')+fmt(Math.abs(+v)):'—'))+'</td>'
+      +'<td>'+lastBy+'</td>'
+      +'<td style="font-size:11px;color:var(--text2)">'+(r.entered_at?new Date(r.entered_at).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}):'—')+'</td>'
+      +'<td class="amt" style="font-size:11px;color:var(--text2)">'+priorAmt+'</td>'
+      +'<td><button data-week="'+r.collection_week+'" data-loc="'+loc+'" data-inp="ae-'+wkKey+'" onclick="saveActualEntry(this.dataset.week,this.dataset.loc,this.dataset.inp)" style="padding:3px 10px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Save</button></td>'
+      +'</tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text2);padding:20px">No past weeks for '+loc+'</td></tr>';
+}
+
+async function saveActualEntry(week, loc, inputId) {
+  const inp = document.getElementById(inputId);
+  if (!inp) return;
+  const raw = inp.value.replace(/,/g,'').trim();
+  const amt = parseFloat(raw);
+  if (isNaN(amt) || amt < 0) { addMsg('Enter a valid positive number.','error'); return; }
+
+  const author = localStorage.getItem('ar_author') || 'Unknown';
+  const existing = D_fcv.find(r => r.collection_week===week && r.location===loc && r.actual_source==='manual');
+
+  try {
+    if (existing) {
+      // PATCH — shift current to prior
+      await patch('forecast_actuals?collection_week=eq.'+week+'&location=eq.'+encodeURIComponent(loc), {
+        actual_amount:    amt,
+        entered_at:       new Date().toISOString(),
+        entered_by:       author,
+        prior_amount:     +existing.actual_collected,
+        prior_entered_at: existing.entered_at,
+        prior_entered_by: existing.entered_by,
+      });
+    } else {
+      await post('forecast_actuals', {
+        collection_week: week, location: loc,
+        actual_amount: amt, entered_by: author,
+        entered_at: new Date().toISOString(),
+      });
+    }
+    // Audit
+    await post('forecast_actuals_audit', {
+      collection_week: week, location: loc,
+      old_amount: existing ? +existing.actual_collected : null,
+      new_amount: amt, changed_by: author,
+      changed_at: new Date().toISOString(),
+    });
+    addMsg('Saved $'+Math.round(amt).toLocaleString()+' for '+loc+' wk '+week,'success');
+    // Reload
+    fcvLoaded = false;
+    await renderFcVariance();
+  } catch(e) { addMsg('Save failed: '+e.message,'error'); }
+}
+
+
+function syncFcSite(loc) {
+  // Update fc-site dropdown (forecast chart/table)
+  const fcSite = document.getElementById('fc-site');
+  if (fcSite) {
+    // fc-site uses 'all' (lowercase) for All Sites
+    fcSite.value = loc === 'All' ? 'all' : loc;
+  }
+  // Update fcv-loc dropdown (variance tab)
+  const fcvLoc = document.getElementById('fcv-loc');
+  if (fcvLoc) fcvLoc.value = loc;
+  // Update haircut site tabs
+  setHcSite(loc);
+  // Re-render both areas (only if their data is loaded)
+  if (typeof renderForecast === 'function')    renderForecast();
+  if (typeof renderFcVariance === 'function' && fcvLoaded) renderFcVariance();
+}
+
 async function loadAll() {
   document.getElementById('loader').style.display = 'flex';
   try {
@@ -1699,9 +2623,10 @@ async function loadAll() {
     ld('Loading invoice detail…');
     D.invs = await get('vw_ar_invoices_bucketed?select=ar_invoice_id,consolidated_customer,location,invoice_date,due_date,invoice_balance,bucket,days_past_due,salesperson&order=days_past_due.desc&limit=10000');
 
-    ld('Loading notes and flags…');
+    ld('Loading notes, flags and forecast params…');
     D_notes = await get('ar_notes?select=*&order=created_at.desc');
     await loadFlags();
+    await loadHaircutParams();
 
     buildSP();
 
@@ -2913,7 +3838,8 @@ function switchTab(name) {
   if (name === 'collections-analysis') renderCollectionsAnalysis();
   if (name === 'o2c')                  { o2cLoaded = false; renderO2C(); }
   if (name === 'aging-change')         { renderAgingChange(); }
-  if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); }
+  if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); renderHaircutTable(); }
+  if (name === 'fc-variance')          { renderFcVariance(); }
 }
 document.querySelectorAll('.tab').forEach(t => {
   t.setAttribute('tabindex', '0');
@@ -3069,7 +3995,7 @@ async function loadO2CData(forceReload = false) {
       get('v_o2c_customer_dtp?select=*&order=location.asc,invoice_count.desc&limit=1000'),
       get('v_o2c_open_ar?select=*&order=location.asc,month.asc'),
       get('v_o2c_site_dtp?select=*&order=location.asc'),
-      getAll('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,invoice_balance,dtp_source,avg_days,std_days,invoice_type,is_overdue,days_overdue,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=expected_date_base.asc'),
+      getAll('v_forecast_open_invoices?select=ar_invoice_id,location,consolidated_customer,invoice_date,due_date,invoice_balance,adjusted_balance,haircut_amount,recovery_rate,aging_bucket,is_at_risk,is_overdue,days_overdue,invoice_type,dtp_source,avg_days,std_days,expected_date_optimistic,expected_date_base,expected_date_conservative,week_optimistic,week_base,week_conservative&order=is_at_risk.asc,is_overdue.desc,expected_date_base.asc'),
       get('vw_ar_summary?select=location,total_ar'),
     ]);
     O2C.revenue   = rev;
@@ -3582,6 +4508,49 @@ async function renderForecast() {
   });
 
   renderForecastTable();
+
+  // ── At-Risk section ─────────────────────────────────────────────
+  const atRiskRows = (D_forecast || []).filter(r => r.is_at_risk);
+  let arSec = document.getElementById('forecast-atrisk-sec');
+  if (!arSec) {
+    arSec = document.createElement('div');
+    arSec.id = 'forecast-atrisk-sec';
+    const hcSec = document.getElementById('hc-settings-sec');
+    if (hcSec) hcSec.parentNode.insertBefore(arSec, hcSec);
+  }
+  if (atRiskRows.length) {
+    const arGross   = atRiskRows.reduce((s,r) => s + (+r.invoice_balance||0), 0);
+    const arAdj     = atRiskRows.reduce((s,r) => s + (+r.adjusted_balance||0), 0);
+    const arHaircut = atRiskRows.reduce((s,r) => s + (+r.haircut_amount||0), 0);
+    const arPct     = arGross > 0 ? Math.round((1 - arAdj/arGross)*100) : 0;
+    arSec.innerHTML = '<div class="atrisk-sec">'
+      + '<div class="atrisk-hdr">&#9888; At-Risk Receivables — ' + atRiskRows.length + ' invoices &gt; 180 days past due</div>'
+      + '<div class="krow" style="margin-bottom:12px">'
+      + kCard('Gross Balance', fmt(arGross), 'Total at-risk AR at face value', 'var(--red)')
+      + kCard('Haircut (' + arPct + '%)', fmt(arHaircut), 'Estimated uncollectable at current rates', 'var(--amber)')
+      + kCard('Adjusted Balance', fmt(arAdj), 'Expected recovery', 'var(--text)')
+      + '</div>'
+      + '<div style="overflow-x:auto;max-height:260px"><table><thead><tr>'
+      + '<th>Customer</th><th>Site</th><th>Invoice</th><th>Due Date</th>'
+      + '<th class="amt">Balance</th><th class="amt">Rate</th><th class="amt">Adjusted</th><th class="amt">Days O/D</th>'
+      + '</tr></thead><tbody>'
+      + atRiskRows.sort((a,b) => (+b.invoice_balance||0)-(+a.invoice_balance||0))
+          .slice(0,60).map(r =>
+            '<tr><td>' + (r.consolidated_customer||'—') + '</td>'
+            + '<td style="font-size:11px">' + (r.location||'—') + '</td>'
+            + '<td style="font-size:11px">' + (r.ar_invoice_id||'—') + '</td>'
+            + '<td style="font-size:11px">' + (r.due_date ? new Date(r.due_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—') + '</td>'
+            + '<td class="amt">' + fmt(+r.invoice_balance) + '</td>'
+            + '<td class="amt" style="color:var(--red)">' + Math.round((+r.recovery_rate||0)*100) + '%</td>'
+            + '<td class="amt">' + fmt(+r.adjusted_balance) + '</td>'
+            + '<td class="amt" style="color:var(--red);font-weight:600">' + (r.days_overdue||0) + 'd</td>'
+            + '</tr>').join('')
+      + (atRiskRows.length > 60 ? '<tr><td colspan="8" style="text-align:center;color:var(--text2);font-size:11px">+'+(atRiskRows.length-60)+' more…</td></tr>' : '')
+      + '</tbody></table></div>'
+      + '</div>';
+  } else {
+    if (arSec) arSec.innerHTML = '';
+  }
 }
 
 function renderForecastTable() {
@@ -3822,6 +4791,86 @@ function exportForecastExcel() {
   });
 
   XLSX.utils.book_append_sheet(wb, ws, 'Collections Forecast');
+
+  // ── Sheet 2: Customer / Invoice level detail ──────────────────
+  const scenario2  = document.getElementById('fc-scenario').value;
+  const site2      = document.getElementById('fc-site').value;
+  const siteLabel2 = site2 === 'all' ? 'All Sites' : site2;
+  const invData    = (O2C.fcInvoices || [])
+    .filter(r => site2 === 'all' || r.location === site2)
+    .filter(r => +r.invoice_balance > 0)
+    .sort((a,b) => (+b.adjusted_balance||0)-(+a.adjusted_balance||0));
+
+  const dateField2 = scenario2 === 'optimistic'  ? 'expected_date_optimistic'
+                   : scenario2 === 'conservative' ? 'expected_date_conservative'
+                   :                               'expected_date_base';
+  const fmtD = d => d ? new Date(d + 'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
+
+  const inv_header = [
+    'Customer','Site','Invoice #','Invoice Date','Due Date',
+    'Aging Bucket','Days Past Due','DTP Source',
+    'Gross Balance','Recovery Rate %','Haircut Amount','Adjusted Balance',
+    'At-Risk','Expected Collection Date','Forecast Week',
+  ];
+
+  const inv_rows = invData.map(r => [
+    r.consolidated_customer || '',
+    r.location              || '',
+    r.ar_invoice_id         || '',
+    fmtD(r.invoice_date),
+    fmtD(r.due_date),
+    r.aging_bucket          || '',
+    +r.days_overdue         || 0,
+    r.dtp_source            || '',
+    +r.invoice_balance      || 0,
+    +((+r.recovery_rate||1)*100).toFixed(1),
+    +r.haircut_amount       || 0,
+    +r.adjusted_balance     || 0,
+    r.is_at_risk ? 'Yes' : 'No',
+    fmtD(r[dateField2] || r.expected_date_base),
+    fmtD(r.week_base),
+  ]);
+
+  const inv_meta = [
+    ['Apex Geotech — Invoice-Level Forecast Detail'],
+    ['Scenario: ' + (scenario2.charAt(0).toUpperCase()+scenario2.slice(1)),
+     'Site: ' + siteLabel2,
+     'Haircut applied per Recovery Rate Assumptions',
+     'Generated: ' + new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})],
+    [],
+    inv_header,
+  ];
+  const inv_all = [...inv_meta, ...inv_rows];
+  const ws2 = XLSX.utils.aoa_to_sheet(inv_all);
+
+  ws2['!cols'] = [
+    {wch:35},{wch:14},{wch:16},{wch:12},{wch:12},
+    {wch:12},{wch:10},{wch:14},
+    {wch:14},{wch:12},{wch:14},{wch:14},
+    {wch:8},{wch:16},{wch:14},
+  ];
+
+  const numFmt2  = '#,##0.00;[Red]-#,##0.00';
+  const pctFmt2  = '0.0';
+  const hdrRowIdx2 = 3;
+  for (let ri = hdrRowIdx2 + 1; ri < inv_all.length; ri++) {
+    [[6,'0'],[8,numFmt2],[9,pctFmt2],[10,numFmt2],[11,numFmt2]].forEach(([ci,fmt]) => {
+      const ref = XLSX.utils.encode_cell({r:ri,c:ci});
+      if (ws2[ref] && ws2[ref].t === 'n') ws2[ref].z = fmt;
+    });
+  }
+  inv_header.forEach((_,ci) => {
+    const ref = XLSX.utils.encode_cell({r:hdrRowIdx2,c:ci});
+    if (!ws2[ref]) return;
+    ws2[ref].s = {
+      font:{bold:true,color:{rgb:'FFFFFF'}},
+      fill:{fgColor:{rgb:'1F4E79'}},
+      alignment:{horizontal:'center',wrapText:true},
+    };
+  });
+  ws2['!freeze'] = {xSplit:0, ySplit: hdrRowIdx2 + 1};
+  XLSX.utils.book_append_sheet(wb, ws2, 'Invoice Detail');
+
   XLSX.writeFile(wb, 'collections_forecast_' + scenario + '_' + site.replace(/\s+/g, '_') + '.xlsx');
 }
 
