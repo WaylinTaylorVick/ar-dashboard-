@@ -2691,6 +2691,7 @@ async function renderPdrep() {
     ld('Loading past due data…');
     D_pdrep = await getAll('v_past_due_by_rep?select=*&order=invoice_balance.desc');
     pdrepLoaded = true;
+    pdrepSort = { k: 'invoice_balance', d: -1 }; // always default to bal desc on first load
     hideLoader();
   }
   // Populate salesperson filter
@@ -2712,6 +2713,7 @@ function filterPdrep() {
   const minBal  = +(document.getElementById('pdrep-minbal')?.value || 0);
 
   let data = D_pdrep.filter(r => {
+    if (+r.invoice_balance < 1) return false; // exclude penny/zero balances
     if (q && !(r.erp_customer_name||'').toLowerCase().includes(q)
            && !(r.consolidated_customer||'').toLowerCase().includes(q)) return false;
     if (site !== 'All' && r.location !== site) return false;
@@ -2725,13 +2727,8 @@ function filterPdrep() {
     return true;
   });
 
-  // Sort
-  data.sort((a,b) => {
-    const av = isNaN(+a[pdrepSort.k]) ? (a[pdrepSort.k]||'') : +a[pdrepSort.k];
-    const bv = isNaN(+b[pdrepSort.k]) ? (b[pdrepSort.k]||'') : +b[pdrepSort.k];
-    if (typeof av === 'string') return av.localeCompare(bv) * pdrepSort.d;
-    return (bv > av ? 1 : bv < av ? -1 : 0) * pdrepSort.d;
-  });
+  // Sort is applied at the customer GROUP level below, not invoice level.
+  // First build groups, then sort the groups by the selected column.
 
   // KPIs
   const custSet   = new Set(data.map(r => r.consolidated_customer));
@@ -2773,7 +2770,38 @@ function filterPdrep() {
     custGroups[key].maxDpd = Math.max(custGroups[key].maxDpd, +r.days_past_due||0);
   });
 
-  const custKeys = Object.keys(custGroups);
+  // Sort customer groups by selected column
+  // Map sort key to a group-level value
+  const groupSortVal = (key) => {
+    const g = custGroups[key];
+    const rep = g.rows[0];
+    switch (pdrepSort.k) {
+      case 'invoice_balance':    return g.bal;
+      case 'days_past_due':      return g.maxDpd;
+      case 'erp_customer_name':  return (rep.erp_customer_name||'').toLowerCase();
+      case 'consolidated_customer': return (rep.consolidated_customer||'').toLowerCase();
+      case 'location':           return (rep.location||'').toLowerCase();
+      case 'salesperson':        return (rep.salesperson||'').toLowerCase();
+      case 'avg_dtp':            return +(rep.avg_dtp||0);
+      case 'payment_trend':      return (rep.payment_trend||'').toLowerCase();
+      case 'bucket':             return g.maxDpd; // sort by worst bucket = max days
+      default:                   return g.bal;
+    }
+  };
+
+  const custKeys = Object.keys(custGroups).sort((a, b) => {
+    const av = groupSortVal(a);
+    const bv = groupSortVal(b);
+    if (typeof av === 'string') return av.localeCompare(bv) * pdrepSort.d;
+    // Explicit numeric: d=-1 → descending (largest first)
+    return pdrepSort.d === -1 ? (+bv - +av) : (+av - +bv);
+  });
+
+  // Within each group, always sort invoices by balance descending (secondary sort)
+  custKeys.forEach(key => {
+    custGroups[key].rows.sort((a,b) => (+b.invoice_balance||0) - (+a.invoice_balance||0));
+  });
+
   const visKeys  = custKeys.slice(0, pdrepLim);
 
   const tbody = document.getElementById('pdrep-tbody');
@@ -2805,7 +2833,10 @@ function filterPdrep() {
       <td class="amt" style="font-weight:700">${fmt(g.bal)}</td>
       <td style="font-size:11px">${[...new Set(g.rows.map(r=>r.bucket))].join(', ')}</td>
       <td class="amt" style="font-weight:600;${bucketColor('90+')}">${g.maxDpd}d max</td>
-      <td></td>
+      <td style="font-size:11px;color:var(--text2)">${(() => {
+        const dates = g.rows.map(r => r.due_date).filter(Boolean).sort();
+        return dates.length ? new Date(dates[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
+      })()}</td>
       <td class="amt">${rep.avg_dtp!=null?Math.round(rep.avg_dtp)+'d':'—'}</td>
       <td style="font-size:11px;${rep.payment_trend==='deteriorating'?'color:#e24b4a':rep.payment_trend==='improving'?'color:#1d9e75':''}">
         ${rep.payment_trend==='deteriorating'?'↑ Worsening':rep.payment_trend==='improving'?'↓ Improving':'—'}</td>
