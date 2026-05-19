@@ -2682,9 +2682,7 @@ const PDREP_COLS = [
   { k:'due_date',           label:'Due Date',          cls:'',     fmt: v => v ? new Date(v+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—' },
   { k:'avg_dtp',            label:'Avg DTP',           cls:'amt',  fmt: v => v!=null?Math.round(v)+'d':'—' },
   { k:'payment_trend',      label:'Trend',             cls:'',     fmt: v => v==='deteriorating'?'↑ Worsening':v==='improving'?'↓ Improving':'—' },
-  { k:'credit_hold',        label:'Hold',              cls:'',     fmt: (v,r) => (v===true||v==='true')?'<span class="flag-hold">Hold</span>':'' },
-  { k:'open_lien',          label:'Lien',              cls:'',     fmt: (v,r) => (v===true||v==='true')?'<span class="flag-lien">Lien</span>':'' },
-];
+];  // Hold/Lien rendered via flagCellHtml, not as data columns
 
 async function renderPdrep() {
   if (!pdrepLoaded) {
@@ -2833,6 +2831,7 @@ function filterPdrep() {
       <td class="amt" style="font-weight:700">${fmt(g.bal)}</td>
       <td style="font-size:11px">${[...new Set(g.rows.map(r=>r.bucket))].join(', ')}</td>
       <td class="amt" style="font-weight:600;${bucketColor('90+')}">${g.maxDpd}d max</td>
+      <td style="text-align:center">${g.rows.some(r=>r.aging_into_60_by_sunday===true||r.aging_into_60_by_sunday==='true')?'<span style="font-size:10px;color:#185fa5;font-weight:700">⚠ Yes</span>':''}</td>
       <td style="font-size:11px;color:var(--text2)">${(() => {
         const dates = g.rows.map(r => r.due_date).filter(Boolean).sort();
         return dates.length ? new Date(dates[0]+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—';
@@ -2840,7 +2839,7 @@ function filterPdrep() {
       <td class="amt">${rep.avg_dtp!=null?Math.round(rep.avg_dtp)+'d':'—'}</td>
       <td style="font-size:11px;${rep.payment_trend==='deteriorating'?'color:#e24b4a':rep.payment_trend==='improving'?'color:#1d9e75':''}">
         ${rep.payment_trend==='deteriorating'?'↑ Worsening':rep.payment_trend==='improving'?'↓ Improving':'—'}</td>
-      <td colspan="2" onclick="event.stopPropagation()">${flagHtml}</td>
+      <td onclick="event.stopPropagation()" style="white-space:nowrap">${flagHtml}</td>
       <td onclick="event.stopPropagation()">${noteHtml}</td>
       <td>${riskHtml||'—'}</td>
     </tr>`;
