@@ -296,6 +296,7 @@ tr.trow:hover td{background:var(--accent);color:#fff}
   <div class="tdiv"></div>
   <span class="tgl">AR Detail</span>
   <div class="tab active" data-tab="ov">Overview</div>
+  <div class="tab" data-tab="pdrep" onclick="switchTab('pdrep')">&#9888; Past Due by Rep</div>
   <div class="tab" data-tab="coll">Collection Actions</div>
   <div class="tab" data-tab="aging-change">Aging Change</div>
   <div class="tab" data-tab="cust">Customer Detail</div>
@@ -368,6 +369,72 @@ tr.trow:hover td{background:var(--accent);color:#fff}
         <th class="amt">Total AR</th><th class="amt">61-90</th><th class="amt">90+</th>
         <th class="amt">60+ Total</th><th class="amt">60+ %</th>
       </tr></thead><tbody id="exrisk"></tbody></table>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ PAST DUE BY REP ══════════════ -->
+<div class="panel" id="panel-pdrep">
+
+  <div class="krow" id="pdrep-kpis"></div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+    <div class="sec">
+      <div class="shdr"><div class="stitle">60+ AR by Salesperson</div></div>
+      <div style="position:relative;height:220px;padding:12px"><canvas id="pdrepSpChart"></canvas></div>
+    </div>
+    <div class="sec">
+      <div class="shdr"><div class="stitle">60+ AR by Site</div></div>
+      <div style="position:relative;height:220px;padding:12px"><canvas id="pdrepSiteChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="sec" style="margin-bottom:12px">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+      <div class="fg"><label>Customer (ERP)</label>
+        <input type="text" id="pdrep-cust" placeholder="Search customer…" oninput="filterPdrep()" style="width:180px"></div>
+      <div class="fg"><label>Site</label>
+        <select id="pdrep-site" onchange="filterPdrep()">
+          <option value="All">All Sites</option>
+          <option value="Brookville">Brookville</option>
+          <option value="Kilgore">Kilgore</option>
+          <option value="Wilkes-Barre">Wilkes-Barre</option>
+        </select></div>
+      <div class="fg"><label>Salesperson</label>
+        <select id="pdrep-sp" onchange="filterPdrep()"><option value="All">All Reps</option></select></div>
+      <div class="fg"><label>Bucket</label>
+        <select id="pdrep-bucket" onchange="filterPdrep()">
+          <option value="All">All 60+</option>
+          <option value="61-90">61–90 Days</option>
+          <option value="90+">90+ Days</option>
+          <option value="aging">Aging into 60 by Sunday</option>
+        </select></div>
+      <div class="fg"><label>Min Balance</label>
+        <input type="number" id="pdrep-minbal" placeholder="0" min="0" step="1000"
+          oninput="filterPdrep()" style="width:100px"></div>
+      <div style="margin-left:auto;display:flex;gap:6px;align-items:flex-end">
+        <button onclick="exportPdrepExcel()" style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text);font-weight:600">&#8681; Excel</button>
+        <button onclick="exportPdrepCsv()"   style="padding:4px 12px;font-size:11px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text);font-weight:600">&#8681; CSV</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="shdr" style="justify-content:space-between">
+      <div>
+        <div class="stitle">Past Due Invoices ≥ 60 Days</div>
+        <div class="ssub" id="pdrep-sub">Including invoices aging into 60+ by coming Sunday</div>
+      </div>
+      <span style="font-size:11px;color:var(--text2)">Click headers to sort &bull; Click ▶ to expand invoices</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="pdrep-tbl">
+        <thead><tr id="pdrep-thead"></tr></thead>
+        <tbody id="pdrep-tbody"></tbody>
+      </table>
+    </div>
+    <div id="pdrep-more" class="hidden" style="text-align:center;padding:10px">
+      <button onclick="pdrepLim+=50;filterPdrep()" style="font-size:12px;padding:5px 16px;border:1px solid var(--border);border-radius:4px;cursor:pointer;background:var(--bg3);color:var(--text)">Show more…</button>
     </div>
   </div>
 </div>
@@ -2593,6 +2660,350 @@ function syncFcSite(loc) {
   if (typeof renderFcVariance === 'function' && fcvLoaded) renderFcVariance();
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+// PAST DUE BY REP
+// ══════════════════════════════════════════════════════════════════
+let D_pdrep       = [];
+let pdrepLoaded   = false;
+let pdrepSort     = { k: 'invoice_balance', d: -1 };
+let pdrepLim      = 50;
+let pdrepExpanded = new Set(); // set of consolidated_customer keys that are expanded
+
+const PDREP_COLS = [
+  { k:'erp_customer_name',  label:'Customer (ERP)',    cls:'',     fmt: v => v||'—' },
+  { k:'consolidated_customer', label:'Consolidated',   cls:'',     fmt: v => v||'—' },
+  { k:'location',           label:'Site',              cls:'',     fmt: v => v||'—' },
+  { k:'salesperson',        label:'Salesperson',       cls:'',     fmt: v => v||'—' },
+  { k:'invoice_balance',    label:'Balance',           cls:'amt',  fmt: v => fmt(+v) },
+  { k:'bucket',             label:'Bucket',            cls:'',     fmt: v => v },
+  { k:'days_past_due',      label:'Days O/D',          cls:'amt',  fmt: v => v+'d' },
+  { k:'aging_into_60_by_sunday', label:'Aging into 60 by Sun', cls:'', fmt: v => v===true||v==='true'?'⚠ Yes':'' },
+  { k:'due_date',           label:'Due Date',          cls:'',     fmt: v => v ? new Date(v+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}) : '—' },
+  { k:'avg_dtp',            label:'Avg DTP',           cls:'amt',  fmt: v => v!=null?Math.round(v)+'d':'—' },
+  { k:'payment_trend',      label:'Trend',             cls:'',     fmt: v => v==='deteriorating'?'↑ Worsening':v==='improving'?'↓ Improving':'—' },
+  { k:'credit_hold',        label:'Hold',              cls:'',     fmt: (v,r) => (v===true||v==='true')?'<span class="flag-hold">Hold</span>':'' },
+  { k:'open_lien',          label:'Lien',              cls:'',     fmt: (v,r) => (v===true||v==='true')?'<span class="flag-lien">Lien</span>':'' },
+];
+
+async function renderPdrep() {
+  if (!pdrepLoaded) {
+    ld('Loading past due data…');
+    D_pdrep = await getAll('v_past_due_by_rep?select=*&order=invoice_balance.desc');
+    pdrepLoaded = true;
+    hideLoader();
+  }
+  // Populate salesperson filter
+  const spSel = document.getElementById('pdrep-sp');
+  const curSp = spSel?.value || 'All';
+  const sps = [...new Set(D_pdrep.map(r => r.salesperson || 'Unassigned').filter(Boolean))].sort();
+  if (spSel) {
+    spSel.innerHTML = '<option value="All">All Reps</option>'
+      + sps.map(s => `<option${s===curSp?' selected':''}>${s}</option>`).join('');
+  }
+  filterPdrep();
+}
+
+function filterPdrep() {
+  const q       = (document.getElementById('pdrep-cust')?.value   || '').toLowerCase();
+  const site    = document.getElementById('pdrep-site')?.value    || 'All';
+  const sp      = document.getElementById('pdrep-sp')?.value      || 'All';
+  const bucket  = document.getElementById('pdrep-bucket')?.value  || 'All';
+  const minBal  = +(document.getElementById('pdrep-minbal')?.value || 0);
+
+  let data = D_pdrep.filter(r => {
+    if (q && !(r.erp_customer_name||'').toLowerCase().includes(q)
+           && !(r.consolidated_customer||'').toLowerCase().includes(q)) return false;
+    if (site !== 'All' && r.location !== site) return false;
+    if (sp   !== 'All' && (r.salesperson||'Unassigned') !== sp) return false;
+    if (bucket === 'aging') {
+      if (!(r.aging_into_60_by_sunday===true||r.aging_into_60_by_sunday==='true')) return false;
+    } else if (bucket !== 'All') {
+      if (r.bucket !== bucket) return false;
+    }
+    if (minBal > 0 && +r.invoice_balance < minBal) return false;
+    return true;
+  });
+
+  // Sort
+  data.sort((a,b) => {
+    const av = isNaN(+a[pdrepSort.k]) ? (a[pdrepSort.k]||'') : +a[pdrepSort.k];
+    const bv = isNaN(+b[pdrepSort.k]) ? (b[pdrepSort.k]||'') : +b[pdrepSort.k];
+    if (typeof av === 'string') return av.localeCompare(bv) * pdrepSort.d;
+    return (bv > av ? 1 : bv < av ? -1 : 0) * pdrepSort.d;
+  });
+
+  // KPIs
+  const custSet   = new Set(data.map(r => r.consolidated_customer));
+  const total60   = data.reduce((s,r) => s+(+r.invoice_balance||0), 0);
+  const cnt90plus = data.filter(r => r.bucket==='90+').length;
+  const agingCnt  = data.filter(r => r.aging_into_60_by_sunday===true||r.aging_into_60_by_sunday==='true').length;
+  const kEl = document.getElementById('pdrep-kpis');
+  if (kEl) kEl.innerHTML =
+      kCard('Customers w/ 60+ AR', custSet.size.toLocaleString(), 'Needing action', '#e24b4a')
+    + kCard('Total 60+ Balance', fmt(total60), 'Open invoices ≥ 60 days', '#e24b4a')
+    + kCard('90+ Invoices', cnt90plus.toLocaleString(), 'Most at-risk', '#ba7517')
+    + kCard('Aging into 60 by Sunday', agingCnt.toLocaleString(), 'Proactive outreach', '#185fa5');
+
+  // Charts
+  renderPdrepCharts(data);
+
+  // Build thead
+  const thead = document.getElementById('pdrep-thead');
+  if (thead) thead.innerHTML =
+      '<th style="width:28px"></th>' // expand toggle
+    + PDREP_COLS.map(c =>
+        `<th class="${c.cls}" style="cursor:pointer;white-space:nowrap" onclick="pdrepSortBy('${c.k}')">`
+        + c.label
+        + (pdrepSort.k===c.k ? (pdrepSort.d===-1?' ↓':' ↑') : '')
+        + '</th>'
+      ).join('')
+    + '<th style="white-space:nowrap">Hold / Lien</th>'
+    + '<th>Note</th>'
+    + '<th style="white-space:nowrap">Risk Factors</th>';
+
+  // Group by customer for expand/collapse display
+  // Each "row" in the table is the customer-level aggregate + individual invoices below
+  const custGroups = {};
+  data.forEach(r => {
+    const key = (r.consolidated_customer||r.erp_customer_name||'');
+    if (!custGroups[key]) custGroups[key] = { rows:[], bal:0, maxDpd:0, location:r.location, sp:r.salesperson };
+    custGroups[key].rows.push(r);
+    custGroups[key].bal += +r.invoice_balance||0;
+    custGroups[key].maxDpd = Math.max(custGroups[key].maxDpd, +r.days_past_due||0);
+  });
+
+  const custKeys = Object.keys(custGroups);
+  const visKeys  = custKeys.slice(0, pdrepLim);
+
+  const tbody = document.getElementById('pdrep-tbody');
+  const more  = document.getElementById('pdrep-more');
+  if (!tbody) return;
+
+  const bucketColor = b => b==='90+'?'color:#e24b4a;font-weight:600':b==='61-90'?'color:#ba7517':'color:#185fa5;font-style:italic';
+
+  tbody.innerHTML = visKeys.map(key => {
+    const g       = custGroups[key];
+    const rep     = g.rows[0];
+    const isExp   = pdrepExpanded.has(key);
+    const escKey  = encodeURIComponent(key);
+    const flagHtml = flagCellHtml(rep.consolidated_customer);
+    const noteHtml = noteBadgeHtml(rep.consolidated_customer);
+    const risks = [];
+    if (g.maxDpd > 90) risks.push('90+ overdue');
+    if (rep.payment_trend==='deteriorating') risks.push('Worsening trend');
+    if (rep.credit_hold===true||rep.credit_hold==='true') risks.push('Credit hold');
+    const riskHtml = risks.map(r=>`<span class="rtag">${r}</span>`).join('');
+
+    // Customer summary row
+    let rows = `<tr style="cursor:pointer;background:var(--bg2)" onclick="pdrepToggle('${escKey}')">
+      <td style="text-align:center;font-size:11px;color:#185fa5;font-weight:600">${isExp?'▼':'▶'}</td>
+      <td><strong>${rep.erp_customer_name||key}</strong>${customerFlagBadges(rep.consolidated_customer)}</td>
+      <td style="color:var(--text2);font-size:11px">${rep.consolidated_customer||'—'}</td>
+      <td style="font-size:11px">${rep.location||'—'}</td>
+      <td style="font-size:11px">${rep.salesperson||'—'}</td>
+      <td class="amt" style="font-weight:700">${fmt(g.bal)}</td>
+      <td style="font-size:11px">${[...new Set(g.rows.map(r=>r.bucket))].join(', ')}</td>
+      <td class="amt" style="font-weight:600;${bucketColor('90+')}">${g.maxDpd}d max</td>
+      <td></td>
+      <td class="amt">${rep.avg_dtp!=null?Math.round(rep.avg_dtp)+'d':'—'}</td>
+      <td style="font-size:11px;${rep.payment_trend==='deteriorating'?'color:#e24b4a':rep.payment_trend==='improving'?'color:#1d9e75':''}">
+        ${rep.payment_trend==='deteriorating'?'↑ Worsening':rep.payment_trend==='improving'?'↓ Improving':'—'}</td>
+      <td colspan="2" onclick="event.stopPropagation()">${flagHtml}</td>
+      <td onclick="event.stopPropagation()">${noteHtml}</td>
+      <td>${riskHtml||'—'}</td>
+    </tr>`;
+
+    // Invoice detail rows (shown when expanded)
+    if (isExp) {
+      rows += g.rows.map(inv => {
+        const aging = inv.aging_into_60_by_sunday===true||inv.aging_into_60_by_sunday==='true';
+        return `<tr style="background:var(--bg3);font-size:11px">
+          <td></td>
+          <td style="padding-left:20px;color:var(--text2)">${inv.ar_invoice_id?.trim()||'—'}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td class="amt">${fmt(+inv.invoice_balance)}</td>
+          <td><span style="${bucketColor(inv.bucket)}">${inv.bucket}</span>${aging?'<span style="margin-left:4px;font-size:9px;color:#185fa5;font-weight:700">↑ AGING</span>':''}</td>
+          <td class="amt" style="${bucketColor(inv.bucket)}">${inv.days_past_due}d</td>
+          <td style="color:var(--text2)">${inv.due_date?new Date(inv.due_date+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'2-digit'}):'—'}</td>
+          <td></td><td></td>
+          <td colspan="2">${invoiceNoteBadgeHtml((inv.ar_invoice_id||'').trim())}</td>
+          <td></td><td></td>
+        </tr>`;
+      }).join('');
+    }
+    return rows;
+  }).join('');
+
+  if (more) {
+    if (custKeys.length > pdrepLim) {
+      more.classList.remove('hidden');
+      more.querySelector('button').textContent = `Show more… (${custKeys.length - pdrepLim} remaining)`;
+    } else {
+      more.classList.add('hidden');
+    }
+  }
+  document.getElementById('pdrep-sub').textContent =
+    `${data.length} invoices · ${custSet.size} customers · ${fmt(total60)} total 60+ AR`;
+}
+
+function pdrepToggle(escKey) {
+  const key = decodeURIComponent(escKey);
+  if (pdrepExpanded.has(key)) pdrepExpanded.delete(key);
+  else pdrepExpanded.add(key);
+  filterPdrep();
+}
+
+function pdrepSortBy(col) {
+  if (pdrepSort.k === col) pdrepSort.d *= -1;
+  else { pdrepSort.k = col; pdrepSort.d = -1; }
+  filterPdrep();
+}
+
+function renderPdrepCharts(data) {
+  // By Salesperson
+  const spMap = {};
+  data.forEach(r => {
+    const sp = r.salesperson || 'Unassigned';
+    spMap[sp] = (spMap[sp]||0) + (+r.invoice_balance||0);
+  });
+  const spEntries = Object.entries(spMap).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const ctxSp = document.getElementById('pdrepSpChart')?.getContext('2d');
+  if (ctxSp) {
+    if (charts.pdrepSp) charts.pdrepSp.destroy();
+    charts.pdrepSp = new Chart(ctxSp, {
+      type:'bar',
+      data:{ labels:spEntries.map(e=>e[0]), datasets:[{
+        label:'60+ AR', data:spEntries.map(e=>Math.round(e[1])),
+        backgroundColor:'rgba(139,35,50,.3)', borderColor:'#8b2332', borderWidth:1.5
+      }]},
+      options:{ responsive:true, maintainAspectRatio:false, indexAxis:'y',
+        plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>'$'+Math.round(c.raw).toLocaleString()}} },
+        scales:{ x:{ticks:{callback:v=>'$'+Math.round(v/1000)+'K'}}, y:{ticks:{font:{size:10}}} }
+      }
+    });
+  }
+  // By Site
+  const siteMap = {};
+  data.forEach(r => { siteMap[r.location||'?'] = (siteMap[r.location||'?']||0) + (+r.invoice_balance||0); });
+  const ctxSite = document.getElementById('pdrepSiteChart')?.getContext('2d');
+  if (ctxSite) {
+    if (charts.pdrepSite) charts.pdrepSite.destroy();
+    const sites = Object.keys(siteMap);
+    charts.pdrepSite = new Chart(ctxSite, {
+      type:'doughnut',
+      data:{ labels:sites, datasets:[{
+        data:sites.map(s=>Math.round(siteMap[s])),
+        backgroundColor:['rgba(139,35,50,.7)','rgba(55,138,221,.7)','rgba(29,158,117,.7)'],
+        borderWidth:1
+      }]},
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{position:'bottom',labels:{font:{size:11}}},
+          tooltip:{callbacks:{label:c=>c.label+': $'+Math.round(c.raw).toLocaleString()}} }
+      }
+    });
+  }
+}
+
+// ── Export functions ──────────────────────────────────────────────
+function buildPdrepExportData() {
+  const q      = (document.getElementById('pdrep-cust')?.value||'').toLowerCase();
+  const site   = document.getElementById('pdrep-site')?.value||'All';
+  const sp     = document.getElementById('pdrep-sp')?.value||'All';
+  const bucket = document.getElementById('pdrep-bucket')?.value||'All';
+  const minBal = +(document.getElementById('pdrep-minbal')?.value||0);
+  const data = D_pdrep.filter(r => {
+    if (q && !(r.erp_customer_name||'').toLowerCase().includes(q)
+           && !(r.consolidated_customer||'').toLowerCase().includes(q)) return false;
+    if (site!=='All' && r.location!==site) return false;
+    if (sp!=='All' && (r.salesperson||'Unassigned')!==sp) return false;
+    if (bucket==='aging') { if (!(r.aging_into_60_by_sunday===true||r.aging_into_60_by_sunday==='true')) return false; }
+    else if (bucket!=='All') { if (r.bucket!==bucket) return false; }
+    if (minBal>0 && +r.invoice_balance<minBal) return false;
+    return true;
+  }).sort((a,b) => (+b.invoice_balance||0)-(+a.invoice_balance||0));
+
+  const header = [
+    'Customer (ERP)','Consolidated Customer','Site','Salesperson',
+    'Invoice #','Invoice Date','Due Date','Days Past Due','Bucket',
+    'Invoice Balance','Invoice Total','Invoice Paid',
+    'Aging into 60 by Sunday','Avg DTP','Payment Trend',
+    'Credit Hold','Open Lien'
+  ];
+  const fmtD = d => d?new Date(d+'T00:00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+  const rows = data.map(r => [
+    r.erp_customer_name||'', r.consolidated_customer||'',
+    r.location||'', r.salesperson||'',
+    (r.ar_invoice_id||'').trim(),
+    fmtD(r.invoice_date), fmtD(r.due_date),
+    +r.days_past_due||0, r.bucket||'',
+    +r.invoice_balance||0, +r.invoice_total||0, +r.invoice_paid||0,
+    (r.aging_into_60_by_sunday===true||r.aging_into_60_by_sunday==='true')?'Yes':'No',
+    r.avg_dtp!=null?Math.round(+r.avg_dtp):'',
+    r.payment_trend||'',
+    (r.credit_hold===true||r.credit_hold==='true')?'Yes':'No',
+    (r.open_lien===true||r.open_lien==='true')?'Yes':'No',
+  ]);
+  return { header, rows };
+}
+
+function exportPdrepExcel() {
+  const { header, rows } = buildPdrepExportData();
+  if (!rows.length) { addMsg('No data to export.','error'); return; }
+  if (typeof XLSX==='undefined') {
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload=exportPdrepExcel; document.head.appendChild(s); return;
+  }
+  const sheetData = [
+    ['Apex Geotech — Past Due by Rep (≥ 60 Days)'],
+    ['Generated: '+new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}),
+     'Filters: site='+document.getElementById('pdrep-site')?.value+' sp='+document.getElementById('pdrep-sp')?.value],
+    [],
+    header,
+    ...rows
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  ws['!cols'] = [
+    {wch:30},{wch:25},{wch:12},{wch:20},{wch:16},
+    {wch:12},{wch:12},{wch:10},{wch:10},
+    {wch:14},{wch:14},{wch:14},
+    {wch:10},{wch:8},{wch:14},{wch:10},{wch:10}
+  ];
+  const numFmt = '#,##0.00;[Red]-#,##0.00';
+  const hdrRow = 3;
+  for (let ri=hdrRow+1;ri<sheetData.length;ri++) {
+    [9,10,11].forEach(ci => {
+      const ref=XLSX.utils.encode_cell({r:ri,c:ci});
+      if (ws[ref]&&ws[ref].t==='n') ws[ref].z=numFmt;
+    });
+  }
+  header.forEach((_,ci) => {
+    const ref=XLSX.utils.encode_cell({r:hdrRow,c:ci});
+    if (!ws[ref]) return;
+    ws[ref].s={font:{bold:true,color:{rgb:'FFFFFF'}},fill:{fgColor:{rgb:'8B2332'}}};
+  });
+  ws['!freeze']={xSplit:0,ySplit:hdrRow+1};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Past Due by Rep');
+  XLSX.writeFile(wb,'past_due_by_rep_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+
+function exportPdrepCsv() {
+  const { header, rows } = buildPdrepExportData();
+  if (!rows.length) { addMsg('No data to export.','error'); return; }
+  const esc = v => { const s=String(v==null?'':v); return s.includes(',')||s.includes('"')||s.includes('\n')?'"'+s.replace(/"/g,'""')+'"':s; };
+  const lines = [header,...rows].map(r=>r.map(esc).join(','));
+  const blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='past_due_by_rep_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
 async function loadAll() {
   document.getElementById('loader').style.display = 'flex';
   try {
@@ -3838,6 +4249,7 @@ function switchTab(name) {
   if (name === 'collections-analysis') renderCollectionsAnalysis();
   if (name === 'o2c')                  { o2cLoaded = false; renderO2C(); }
   if (name === 'aging-change')         { renderAgingChange(); }
+  if (name === 'pdrep')                { renderPdrep(); }
   if (name === 'coll-forecast')        { o2cLoaded = false; renderForecast(); renderHaircutTable(); }
   if (name === 'fc-variance')          { renderFcVariance(); }
 }
